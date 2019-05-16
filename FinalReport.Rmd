@@ -1,0 +1,41 @@
+---
+title: "Heart Disease Analysis Project"
+author: "Florian Seka"
+date: "16/05/2019"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+  pdf_document:
+    toc: yes
+  word_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+### Motivation and purpose of the analysis
+### Executive summary
+### Additionnal information
+Github link
+
+
+## Raw dataset description
+### Data Source and structure
+### Feature description
+
+## Analysis
+
+### Data preparation
+### Feature exploration
+### Strategy and methods
+### Models evaluation
+
+## Final Results
+## Conclusions
+## References and Credits
+Ajouter le nom des personnes à mentionner concernant l'origine des données.
