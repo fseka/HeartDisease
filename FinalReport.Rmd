@@ -1,0 +1,99 @@
+---
+title: "Heart Disease Analysis Project"
+author: "Florian Seka"
+date: "16/05/2019"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 4
+    number_sections: true
+    df_print: kable
+  html_document:
+    df_print: paged
+    toc: yes
+documentclass: report
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+## Motivation and purpose
+
+The purpose of this report is to document the various strategies investigated in the frame of the data science capstone final project, in partial fulfillment of the requirements for the EDX Harvard Data Science Professional Certificate.
+
+In the first part of the report, information is briefly given about the structuring and preparation of the data used to build and evaluate the machine learning algorithms, as well as the different methods that will be developped to achieve the best possible final result. In the second part, the final, optimized, algorithm is selected and tested against the validation dataset.
+
+## Project Presentation
+
+The subject chosen for this capstone project is the Heart Disease Data Set from the UCI Machine learning repository. This dataset gathers data from four different medical institution and provides, for each patient, a number of attributes, as well as a measure of heart disease presence (from "no presence" to different levels of presence). Our objective will be to predict, given a patients set of attributes (medical parameters), the presence or absence of medical disease.
+
+## Executive summary
+
+After having determined the most important features in the dataset, and tested a variety of machine learning methods, the retained method was XXXXX. Applied to the validation data set, an ROC AUC of XXX could be achieved, corresponding to an accuracy of XXXX and the following confusion matrix: XXXX.
+
+
+## Additionnal information
+
+The analysis was carried out using the R langauge in the R Studio developement environment. All scripts and data in support of this project are available for download from a dedicated version control repository:
+
+https://github.com/fseka/HeartDisease
+
+Ajouter un README sur github ou alors le rapport lui même.
+
+
+## Raw dataset description
+### Data Source and structure
+
+The data used for this experiment was created by four medical research entities:
+* Hungarian Institute of Cardiology.
+* University Hospital, Zurich, Switzerland 
+* University Hospital, Basel, Switzerland
+* V.A. Medical Center, Long Beach and Cleveland Clinic Foundation
+
+The data was retrieved from the UCI Machine Learning Repository https://archive.ics.uci.edu/ml/datasets/heart+disease and consists of four individual files in the same format and structure:
+
+* processed.cleveland.data
+* processed.hungarian.data
+* processed.switzerland.data
+* processed.va.data
+
+In the data, each row correspond to a patient and each of the 13 columns to an attribute, the 14th column being the rating of heart disease presence (from 0 to 4, 0 corresponding to the absence of disease).
+
+### Feature description
+
+The 13 features in the dataset were described in the repository archive and are as follows:
+
+1. **age**: The patient age 
+2. **sex**: The patient sex 
+3. **cp**: Chest pain type (from 1 to 4, in 1 increments)
+4. **trestbps**: Resting blood pressure (in mm Hg on admission to the hospital)
+5. **chol** serum cholestoral in mg/dl 
+6. **fbs**: (fasting blood sugar > 120 mg/dl) (1 = true; 0 = false)
+7. **restecg**: resting electrocardiographic results
+i) Value 0: normal 
+i) Value 1: having ST-T wave abnormality (T wave inversions and/or ST elevation or depression of > 0.05 mV) 
+i) Value 2: showing probable or definite left ventricular hypertrophy by Estes' criteria
+8. **thalach**: maximum heart rate achieved 
+9. **exang**: exercise induced angina 
+10. **oldpeak**: ST depression induced by exercise relative to rest 
+11. **slope**: the slope of the peak exercise ST segment 
+i) Value 1: upsloping 
+i) Value 2: flat 
+i) Value 3: downsloping  
+12. **ca**: number of major vessels (0-3) colored by flourosopy 
+13. **thal**: Thalium stress test result : 3 = normal; 6 = fixed defect; 7 = reversable defect 
+
+# Analysis
+
+## Data preparation
+## Feature exploration
+## Strategy and methods
+## Models evaluation
+
+# Final Results
+# Conclusions and further investigation
+# References and Credits
+Ajouter le nom des personnes à mentionner concernant l'origine des données.
