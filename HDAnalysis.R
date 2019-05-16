@@ -1,5 +1,6 @@
 library(tidyverse)
 library(caret)
+library(ggthemes)
 
 datasetdir<-file.path(getwd(),"Data")
 datacolnames <- c("age","sex","cp","trestbps","chol","fbs","restecg","thalach","exang","oldpeak","slope","ca","thal","target") #defining the column names
@@ -59,7 +60,7 @@ nrow(heartdisease)
 # The feature exploration will then be carried out on the training set. Final performance evaluation will be carried out on the validation set.
 
 set.seed(2810)
-val_index <- createDataPartition(y=heartdisease$bhdisp, times=1, p=0.2, list=FALSE)
+val_index <- createDataPartition(y=heartdisease$presence, times=1, p=0.2, list=FALSE)
 hd_trainset <- heartdisease[-val_index,] #defining the heart disease training data set
 hd_valset <- heartdisease[val_index,] #defining the heart disease validation data set
 
