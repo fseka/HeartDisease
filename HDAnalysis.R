@@ -1,6 +1,9 @@
+##Analysis script
+
 library(tidyverse)
 library(caret)
 library(ggthemes)
+
 
 datasetdir<-file.path(getwd(),"Data")
 datacolnames <- c("age","sex","cp","trestbps","chol","fbs","restecg","thalach","exang","oldpeak","slope","ca","thal","target") #defining the column names
