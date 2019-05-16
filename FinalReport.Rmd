@@ -3,6 +3,7 @@ title: "Heart Disease Analysis Project"
 author: "Florian Seka"
 date: "16/05/2019"
 output:
+<<<<<<< HEAD
   pdf_document:
     toc: yes
     toc_depth: 4
@@ -12,12 +13,22 @@ output:
     df_print: paged
     toc: yes
 documentclass: report
+=======
+  html_document:
+    df_print: paged
+    toc: yes
+  pdf_document:
+    toc: yes
+  word_document:
+    toc: yes
+>>>>>>> ae3eec0abe0fce753caf0353499790b483d49265
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+<<<<<<< HEAD
 # Introduction
 
 ## Motivation and purpose
@@ -42,10 +53,19 @@ The analysis was carried out using the R langauge in the R Studio developement e
 https://github.com/fseka/HeartDisease
 
 Ajouter un README sur github ou alors le rapport lui même.
+=======
+## Introduction
+
+### Motivation and purpose of the analysis
+### Executive summary
+### Additionnal information
+Github link
+>>>>>>> ae3eec0abe0fce753caf0353499790b483d49265
 
 
 ## Raw dataset description
 ### Data Source and structure
+<<<<<<< HEAD
 
 The data used for this experiment was created by four medical research entities:
 * Hungarian Institute of Cardiology.
@@ -96,4 +116,18 @@ i) Value 3: downsloping
 # Final Results
 # Conclusions and further investigation
 # References and Credits
+=======
+### Feature description
+
+## Analysis
+
+### Data preparation
+### Feature exploration
+### Strategy and methods
+### Models evaluation
+
+## Final Results
+## Conclusions
+## References and Credits
+>>>>>>> ae3eec0abe0fce753caf0353499790b483d49265
 Ajouter le nom des personnes à mentionner concernant l'origine des données.
