@@ -7,6 +7,8 @@ rm(list=ls())
 library(tidyverse)
 library(caret)
 library(ggthemes)
+library(mice)
+
 
 
 datasetdir<-file.path(getwd(),"Data")
@@ -271,3 +273,20 @@ hd_trainset %>%  filter(!is.na(thal)) %>% group_by(thal,presence) %>% summarise(
   geom_bar(stat="identity")+ 
   scale_fill_manual(values=c("springgreen2","firebrick2"))+
   ylab("Percentages")
+
+# We are facing the issue that some of the features that seem to be important contain a non negligible number of NAs. Here are some statistics:
+round(colSums(is.na(hd_trainset))*100/nrow(hd_trainset),0)
+
+# the slope, ca and thal data features are particularly scarce and we will have to be careful when chosing the right prediction method to avoid bad data fitting.
+
+
+hd_trainset$institute <- NULL
+hd_trainset$target <- NULL
+hd_valset$institute <- NULL
+log<-glm(presence ~ ., data=hd_trainset, family=binomial)
+
+res<-predict(log,hd_valset,type ="response")
+
+#
+#> completeData <- complete(imp,2)
+#> md.pattern(completeData)
