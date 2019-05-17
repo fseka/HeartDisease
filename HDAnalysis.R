@@ -126,6 +126,7 @@ hd_valset <- heartdisease[val_index,] #defining the heart disease validation dat
 ## Feature exploration
 # It is now possible to look closely to the different features in the training set. This first exploration will be carried out by means of data visualisation.
 
+#Continuous features
 # Age
 hd_trainset %>%
   ggplot() +
@@ -135,31 +136,138 @@ hd_trainset %>%
   ylab("Density") + 
   scale_fill_manual(name="Disease", labels=c("Absent","Present"),values=c("springgreen2","firebrick2"))
 
-#Sex
-hd_trainset %>% filter (presence=="Heart Disease") %>%
-  ggplot(aes(age,fill=sex)) +
-  geom_density(alpha = 0.4)
-
 #Cholesterol
 hd_trainset %>% 
   ggplot(aes(chol,fill=presence)) +
   geom_density(alpha = 0.4) +
-  facet_wrap(hd_trainset$institute, ncol=1,scale="free_y")
+  facet_wrap(~institute, ncol=1,scale="free_y")+
+  xlab("Serum cholestoral in mg/dl ") +
+  ylab("Density")
 
 #Trestbps Resting blood pressure (in mm Hg on admission to the hospital)
 hd_trainset %>% 
   ggplot(aes(trestbps,fill=presence)) +
   geom_density(alpha = 0.4) +
-  facet_wrap(hd_trainset$institute, ncol=1,scale="free_y")
+  facet_wrap(~institute, ncol=1,scale="free_y")+
+  xlab("Resting blood pressure in mm Hg") +
+  ylab("Density")
 
 # Thalach maximum heart rate achieved 
 hd_trainset %>% 
   ggplot(aes(thalach,fill=presence)) +
   geom_density(alpha = 0.4) +
-  facet_wrap(hd_trainset$institute, ncol=1,scale="free_y")
+  facet_wrap(~institute, ncol=1,scale="free_y")+
+  xlab("maximum heart rate achieved") +
+  ylab("Density")
 
 # Oldpeak ST depression induced by exercise relative to rest 
 hd_trainset %>% 
   ggplot(aes(oldpeak,fill=presence)) +
   geom_density(alpha = 0.4) +
-  facet_wrap(hd_trainset$institute, ncol=1,scale="free_y")
+  facet_wrap(~institute, ncol=1,scale="free_y")+
+  xlab("ST depression induced by exercise relative to rest") +
+  ylab("Density")
+
+#Categorical features
+
+#Sex
+hd_trainset %>% filter (presence=="Heart Disease") %>%
+  ggplot(aes(age,fill=sex)) +
+  geom_density(alpha = 0.4)
+
+#Chest pain type
+hd_trainset %>%  
+  ggplot() +
+  aes(cp,fill=presence) +
+  geom_histogram(stat="count") +
+  scale_fill_manual(values=c("springgreen2","firebrick2"))
+
+# Chest pain type, in percentages
+hd_trainset %>%  filter(!is.na(cp)) %>% group_by(cp,presence) %>% summarise(count=n()) %>% 
+  mutate(perc=count/sum(count))%>%
+  ggplot(aes(cp,y=perc,fill=presence)) +
+  geom_bar(stat="identity")+ 
+  scale_fill_manual(values=c("springgreen2","firebrick2"))+
+  ylab("Percentages")
+
+#Fast blood sugar
+hd_trainset %>%  
+  ggplot() +
+  aes(fbs,fill=presence) +
+  geom_histogram(stat="count")+ 
+  scale_fill_manual(values=c("springgreen2","firebrick2"))
+
+# Fast blood sugar, filtering out the N/As, in percentages
+hd_trainset %>%  filter(!is.na(fbs)) %>% group_by(fbs,presence) %>% summarise(count=n()) %>% 
+  mutate(perc=count/sum(count))%>%
+  ggplot(aes(fbs,y=perc,fill=presence)) +
+  geom_bar(stat="identity")+ 
+  scale_fill_manual(values=c("springgreen2","firebrick2"))+
+  ylab("Percentages")
+
+#Rest ECG
+hd_trainset %>%  
+  ggplot() +
+  aes(restecg,fill=presence) +
+  geom_histogram(stat="count")+ 
+  scale_fill_manual(values=c("springgreen2","firebrick2"))
+
+#Exercise induced angina 
+hd_trainset %>%  
+  ggplot() +
+  aes(exang,fill=presence) +
+  geom_histogram(stat="count")+ 
+  scale_fill_manual(values=c("springgreen2","firebrick2"))
+
+# Exercise induced angina , filtering out the N/As, in percentages
+hd_trainset %>%  filter(!is.na(exang)) %>% group_by(exang,presence) %>% summarise(count=n()) %>% 
+  mutate(perc=count/sum(count))%>%
+  ggplot(aes(exang,y=perc,fill=presence)) +
+  geom_bar(stat="identity")+ 
+  scale_fill_manual(values=c("springgreen2","firebrick2"))+
+  ylab("Percentages")
+
+
+# the slope of the peak exercise ST segment 
+hd_trainset %>%  
+  ggplot() +
+  aes(presence,fill=slope) +
+  geom_histogram(stat="count")
+
+# number of major vessels (0-3) colored by flourosopy 
+hd_trainset %>%  
+  ggplot() +
+  aes(ca,fill=presence) +
+  geom_histogram(stat="count") +
+  scale_fill_manual(values=c("springgreen2","firebrick2"))
+
+# number of major vessels (0-3) colored by flourosopy, filtering out the N/As 
+hd_trainset %>%  filter(!is.na(ca)) %>%
+  ggplot() +
+  aes(ca,fill=presence) +
+  geom_histogram(stat="count") +
+  scale_fill_manual(values=c("springgreen2","firebrick2"))
+
+# number of major vessels (0-3) colored by flourosopy, filtering out the N/As, in percentages
+hd_trainset %>%  filter(!is.na(ca)) %>% group_by(ca,presence) %>% summarise(count=n()) %>% 
+  mutate(perc=count/sum(count))%>%
+  ggplot(aes(ca,y=perc,fill=presence)) +
+  geom_bar(stat="identity")+ 
+  scale_fill_manual(values=c("springgreen2","firebrick2"))+
+  ylab("Percentages")
+
+# Thalium stress test result, filtering out the N/As 
+hd_trainset %>%  filter(!is.na(thal)) %>%
+  ggplot() +
+  aes(thal,fill=presence) +
+  geom_histogram(stat="count") +
+  scale_fill_manual(values=c("springgreen2","firebrick2"))
+
+
+# Thalium stress test result, filtering out the N/As , in percentages
+hd_trainset %>%  filter(!is.na(thal)) %>% group_by(thal,presence) %>% summarise(count=n()) %>% 
+  mutate(perc=count/sum(count))%>%
+  ggplot(aes(thal,y=perc,fill=presence)) +
+  geom_bar(stat="identity")+ 
+  scale_fill_manual(values=c("springgreen2","firebrick2"))+
+  ylab("Percentages")
