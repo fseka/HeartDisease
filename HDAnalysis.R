@@ -9,6 +9,9 @@ library(caret)
 library(ggthemes)
 library(mice)
 library(ggrepel)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
 
 
 datasetdir<-file.path(getwd(),"Data")
@@ -293,21 +296,65 @@ hd_trainset$target <- NULL
 hd_valset$institute <- NULL
 log<-glm(presence ~ sex+cp+fbs+exang+slope+ca+thal, data=hd_trainset, family=binomial, na.action = na.omit)
 
+##### GLM method
+control_glm <- trainControl(method = "cv", number = 10, p = .9)
+train_glm <- train(presence ~ sex+cp+fbs+exang+slope+ca+thal, method = "glm",family=binomial, data = hd_trainset,trControl = control_glm ,na.action = na.omit)
 
-control <- trainControl(method = "cv", number = 10, p = .9)
-train_glm <- train(presence ~ sex+cp+fbs+exang+slope+ca+thal ~ ., method = "glm", data = data=hd_trainset)
+#glm_results<-predict(log,hd_valset,type ="response")
+glm_results<-predict(train_glm,hd_valset,type ="prob")
+
+##### KNN method
+control_knn <- trainControl(method = "cv", number = 10, p = .9)
+train_knn <- train(presence ~ sex+cp+fbs+exang+slope+ca+thal, method = "knn",data = hd_trainset,trControl = control_knn ,tuneGrid = data.frame(k=seq(1,20,1)),na.action = na.omit)
+
+knn_results<-predict(train_knn,hd_valset,type ="prob")
+
+##### Random Forest
+control_rf <- trainControl(method = "cv", number = 10, p = .9)
+train_rf <- train(presence ~ . ,
+                  method = "Rborist",
+                  tuneGrid = data.frame(predFixed = 2, minNode = c(3,10,25,35,40,45,50,60)),
+                  data = hd_trainset,
+                  trControl = control_rf,
+                  na.action = na.omit)
+  
+rf_results<-predict(train_rf,hd_valset,type ="prob")
+
+
+##### Regression Tree
+control_rt <- trainControl(method = "cv", number = 10, p = .9)
+train_rt <- train(presence ~ . ,
+                  method = "rpart",
+                  data = hd_trainset,
+                  trControl = control_rt,
+                  na.action = na.omit)
+rt_results<-predict(train_rt,hd_valset,type ="prob")
+
+plot(train_rt)
+rpart.plot(train_rt$finalModel,   
+           type=5,
+           fallen.leaves = FALSE,
+           box.palette = "GnRd",
+           nn=TRUE)
 
 
 
-glm_results<-predict(log,hd_valset,type ="response")
-
+# accuracy calcuclation script
+hd_accuracy<-function(fittedModelResult,fittedModelTarget,threshold){
+  #accuracy calculation
+  mean(1*(fittedModelResult==fittedModelTarget))
+}
 
 #AOC UAC function script
-sensispeci<-function(fittedModelResult,fittedDataSet,threshold){
+sensispeci<-function(fittedModelResulti,fittedDataSet,threshold){
   
   #Remove the NAs
+  #keep_index<-complete.cases(fittedDataSet)
+  #fittedModelResult<-fittedModelResult[keep_index]
+  #fittedModelTarget<-fittedDataSet$presence[keep_index]
+  
   keep_index<-complete.cases(fittedDataSet)
-  fittedModelResult<-fittedModelResult[keep_index]
+  fittedModelResult<-as.numeric(fittedModelResulti)
   fittedModelTarget<-fittedDataSet$presence[keep_index]
   
   #converting results in numeric format for evaluation
@@ -319,43 +366,52 @@ sensispeci<-function(fittedModelResult,fittedDataSet,threshold){
   levels(fittedModelResult)[levels(fittedModelResult)==2] <- "Heart Disease"
   
   #confusion Matrix and sensitivity/specificity calculation
-  conf_matrix<-table(fittedModelResult,fittedModelTarget)
-  output<-c(sensitivity(conf_matrix),specificity(conf_matrix),precision(conf_matrix),F_meas(conf_matrix))#
+  #conf_matrix<-table(fittedModelResult,fittedModelTarget)
+  u <- union(fittedModelResult, fittedModelTarget)
+  t <- table(factor(fittedModelResult, u), factor(fittedModelTarget, u))
+  conf_matrix<-confusionMatrix(t)$table
+  
+  output<-c(sensitivity(conf_matrix),specificity(conf_matrix),precision(conf_matrix),F_meas(conf_matrix),hd_accuracy(factor(fittedModelResult, u), factor(fittedModelTarget, u),threshold))#
+  #output<-c(sensitivity(conf_matrix),specificity(conf_matrix),precision(conf_matrix),F_meas(conf_matrix),hd_accuracy(fittedModelResult,fittedModelTarget,threshold))#
   #output<-data.frame("Sensitivity"=sensitivity(conf_matrix),"Specificity"=specificity(conf_matrix),"Precision"=precision(conf_matrix),"F_meas"=F_meas(conf_matrix))
   
 }
 
-
-hd_accuracy<-function(fittedModelResult,fittedDataSet,threshold){
-  
-  #Remove the NAs
-  keep_index<-complete.cases(fittedDataSet)
-  fittedModelResult<-fittedModelResult[keep_index]
-  fittedModelTarget<-fittedDataSet$presence[keep_index]
-  
-  #converting results in numeric format for evaluation
-  fittedModelResult<-ifelse(fittedModelResult>=threshold,2,1)
-  
-  # Adding levels for the heart disease presence column
-  fittedModelResult<-as.factor(fittedModelResult)
-  levels(fittedModelResult)[levels(fittedModelResult)==1] <- "Healthy"
-  levels(fittedModelResult)[levels(fittedModelResult)==2] <- "Heart Disease"
-  
-  #accuracy calculation
-  mean(1*(fittedModelResult==fittedModelTarget))
-}
-
-
-aoc_coef<-function(fittedModelResult, fittedDataSet){
+method_metrics<-function(fittedModelResult, fittedDataSet,ml_method){
   k=seq(0.05,0.95,0.05)
   aocdata<-sapply(k,sensispeci,fittedModelResult=fittedModelResult,fittedDataSet=fittedDataSet)
   aocdata<-as.data.frame(cbind(k,t(aocdata)))
-}
+  aocdata$method<-ml_method
+  aocdata<-setNames(aocdata,c("Threshold","Sensitivity","Specificity","Precision","F1_score","Accuracy","Method"))
+  }
+
+# Building method metrics
+glm_metrics<-method_metrics(glm_results$`Heart Disease`,hd_valset,"glm")
+knn_metrics<-method_metrics(knn_results$`Heart Disease`,hd_valset,"knn")
+rf_metrics<-method_metrics(rf_results$`Heart Disease`,hd_valset,"rf")
+rt_metrics<-method_metrics(rt_results$`Heart Disease`,hd_valset,"rt")
 
 
+# joining the dataframes
+overall_metrics<-rbind(glm_metrics,knn_metrics,rf_metrics,rt_metrics)
+
+## plot overall Accuracy
+overall_metrics %>% group_by(Method) %>% ggplot(aes(x=Threshold,y=Accuracy,label = Threshold,col=Method)) +
+  geom_line()  + 
+  labs(x="Decision Threshold",y="Accuracy") 
+
+## plot overall AOC UAC
+overall_metrics %>% group_by(Method) %>% ggplot(aes(x=1-Specificity,y=Sensitivity,label = Threshold,col=Method)) +
+  geom_line()  + 
+  labs(x="1-specificity",y="Sensitivity")
+
+## plot overall F1_Score
+overall_metrics %>% group_by(Method) %>% ggplot(aes(x=Threshold,y=F1_score,label = Threshold,col=Method)) +
+  geom_line()  + 
+  labs(x="Decision Threshold",y="F1_Score")
 
 ## plot AOC UAC
-aoc_coef(glm_results,hd_valset) %>% ggplot(aes(x=1-V3,y=V2,label = k)) +
+glm_metrics %>% ggplot(aes(x=1-Specificity,y=Sensitivity,label = Threshold)) +
   geom_line()  + 
   geom_point(shape = 21, fill = "red", color = "black", size=3) +
   labs(x="1-specificity",y="Sensitivity") + 
@@ -363,16 +419,25 @@ aoc_coef(glm_results,hd_valset) %>% ggplot(aes(x=1-V3,y=V2,label = k)) +
 
 
 ## plot precision
-aoc_coef(glm_results,hd_valset) %>% ggplot(aes(x=V2,y=V4,label = k)) +
+glm_metrics %>% ggplot(aes(x=Sensitivity,y=Precision,label = Threshold)) +
   geom_line()  + 
   geom_point(shape = 21, fill = "red", color = "black", size=3) +
   labs(x="sensitivity",y="Precision") + 
   geom_text_repel(nudge_x = 0.01, nudge_y = -0.01)
 
 ## F score
-aoc_coef(glm_results,hd_valset) %>% ggplot(aes(x=k,y=V5,label = k)) +
+glm_metrics %>% ggplot(aes(x=Threshold,y=F1_score,label = Threshold)) +
   geom_line()  + 
   geom_point(shape = 21, fill = "red", color = "black", size=3) +
-  labs(x="Cutoff",y="F_1 Score") + 
+  labs(x="Decision Threshold",y="F_1 Score") + 
   geom_text_repel(nudge_x = 0.01, nudge_y = -0.01)
 
+## Accuracy
+glm_metrics %>% ggplot(aes(x=Threshold,y=Accuracy,label = Threshold)) +
+  geom_line()  + 
+  geom_point(shape = 21, fill = "red", color = "black", size=3) +
+  labs(x="Decision Threshold",y="Overall Accuracy") + 
+  geom_text_repel(nudge_x = 0.01, nudge_y = -0.01)
+
+# Maximum accuracy achieved
+glm_metrics$Threshold[which.max(glm_metrics$Accuracy)]
