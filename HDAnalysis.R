@@ -8,7 +8,7 @@ library(tidyverse)
 library(caret)
 library(ggthemes)
 library(mice)
-
+library(ggrepel)
 
 
 datasetdir<-file.path(getwd(),"Data")
@@ -177,6 +177,14 @@ hd_trainset %>% filter (presence=="Heart Disease") %>%
   ggplot(aes(age,fill=sex)) +
   geom_density(alpha = 0.4)
 
+#Sex 2
+hd_trainset %>%  
+  ggplot() +
+  aes(sex,fill=presence) +
+  geom_histogram(stat="count") +
+  scale_fill_manual(values=c("springgreen2","firebrick2"))
+
+
 #Chest pain type
 hd_trainset %>%  
   ggplot() +
@@ -283,10 +291,88 @@ round(colSums(is.na(hd_trainset))*100/nrow(hd_trainset),0)
 hd_trainset$institute <- NULL
 hd_trainset$target <- NULL
 hd_valset$institute <- NULL
-log<-glm(presence ~ ., data=hd_trainset, family=binomial)
+log<-glm(presence ~ sex+cp+fbs+exang+slope+ca+thal, data=hd_trainset, family=binomial, na.action = na.omit)
 
-res<-predict(log,hd_valset,type ="response")
 
-#
-#> completeData <- complete(imp,2)
-#> md.pattern(completeData)
+control <- trainControl(method = "cv", number = 10, p = .9)
+train_glm <- train(presence ~ sex+cp+fbs+exang+slope+ca+thal ~ ., method = "glm", data = data=hd_trainset)
+
+
+
+glm_results<-predict(log,hd_valset,type ="response")
+
+
+#AOC UAC function script
+sensispeci<-function(fittedModelResult,fittedDataSet,threshold){
+  
+  #Remove the NAs
+  keep_index<-complete.cases(fittedDataSet)
+  fittedModelResult<-fittedModelResult[keep_index]
+  fittedModelTarget<-fittedDataSet$presence[keep_index]
+  
+  #converting results in numeric format for evaluation
+  fittedModelResult<-ifelse(fittedModelResult>=threshold,2,1)
+  
+  # Adding levels for the heart disease presence column
+  fittedModelResult<-as.factor(fittedModelResult)
+  levels(fittedModelResult)[levels(fittedModelResult)==1] <- "Healthy"
+  levels(fittedModelResult)[levels(fittedModelResult)==2] <- "Heart Disease"
+  
+  #confusion Matrix and sensitivity/specificity calculation
+  conf_matrix<-table(fittedModelResult,fittedModelTarget)
+  output<-c(sensitivity(conf_matrix),specificity(conf_matrix),precision(conf_matrix),F_meas(conf_matrix))#
+  #output<-data.frame("Sensitivity"=sensitivity(conf_matrix),"Specificity"=specificity(conf_matrix),"Precision"=precision(conf_matrix),"F_meas"=F_meas(conf_matrix))
+  
+}
+
+
+hd_accuracy<-function(fittedModelResult,fittedDataSet,threshold){
+  
+  #Remove the NAs
+  keep_index<-complete.cases(fittedDataSet)
+  fittedModelResult<-fittedModelResult[keep_index]
+  fittedModelTarget<-fittedDataSet$presence[keep_index]
+  
+  #converting results in numeric format for evaluation
+  fittedModelResult<-ifelse(fittedModelResult>=threshold,2,1)
+  
+  # Adding levels for the heart disease presence column
+  fittedModelResult<-as.factor(fittedModelResult)
+  levels(fittedModelResult)[levels(fittedModelResult)==1] <- "Healthy"
+  levels(fittedModelResult)[levels(fittedModelResult)==2] <- "Heart Disease"
+  
+  #accuracy calculation
+  mean(1*(fittedModelResult==fittedModelTarget))
+}
+
+
+aoc_coef<-function(fittedModelResult, fittedDataSet){
+  k=seq(0.05,0.95,0.05)
+  aocdata<-sapply(k,sensispeci,fittedModelResult=fittedModelResult,fittedDataSet=fittedDataSet)
+  aocdata<-as.data.frame(cbind(k,t(aocdata)))
+}
+
+
+
+## plot AOC UAC
+aoc_coef(glm_results,hd_valset) %>% ggplot(aes(x=1-V3,y=V2,label = k)) +
+  geom_line()  + 
+  geom_point(shape = 21, fill = "red", color = "black", size=3) +
+  labs(x="1-specificity",y="Sensitivity") + 
+  geom_text_repel(nudge_x = 0.01, nudge_y = -0.01)
+
+
+## plot precision
+aoc_coef(glm_results,hd_valset) %>% ggplot(aes(x=V2,y=V4,label = k)) +
+  geom_line()  + 
+  geom_point(shape = 21, fill = "red", color = "black", size=3) +
+  labs(x="sensitivity",y="Precision") + 
+  geom_text_repel(nudge_x = 0.01, nudge_y = -0.01)
+
+## F score
+aoc_coef(glm_results,hd_valset) %>% ggplot(aes(x=k,y=V5,label = k)) +
+  geom_line()  + 
+  geom_point(shape = 21, fill = "red", color = "black", size=3) +
+  labs(x="Cutoff",y="F_1 Score") + 
+  geom_text_repel(nudge_x = 0.01, nudge_y = -0.01)
+
