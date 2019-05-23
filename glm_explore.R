@@ -12,6 +12,7 @@ library(ggrepel)
 library(randomForest)
 library(rpart)
 library(rpart.plot)
+library(ROCR)
 
 
 datasetdir<-file.path(getwd(),"Data")
@@ -120,17 +121,67 @@ hd_trainset$institute <- NULL
 hd_trainset$target <- NULL
 hd_valset$institute <- NULL
 
+
+
+control_glm <- trainControl(method = "cv", number = 10, p = .9)
+train_glm <- train(presence ~ sex+cp+fbs+exang+slope+ca+thal, method = "glm",family=binomial, data = hd_trainset,trControl = control_glm ,na.action = na.omit)
+
+#glm_results<-predict(log,hd_valset,type ="response")
+glm_results<-predict(train_glm,hd_valset,type ="prob")
+
+##### KNN method
+control_knn <- trainControl(method = "cv", number = 10, p = .9)
+train_knn <- train(presence ~ sex+cp+fbs+exang+slope+ca+thal, method = "knn",data = hd_trainset,trControl = control_knn ,tuneGrid = data.frame(k=seq(1,20,1)),na.action = na.omit)
+
+knn_results<-predict(train_knn,hd_valset,type ="prob")
+
 ##### Random Forest
+
+
 control_rf <- trainControl(method = "cv", number = 10, p = .9)
-train_rf <- train(presence ~ . ,
+train_rf <- train(presence ~ sex+cp+fbs+exang+slope+ca+thal ,
                   method = "rf",
                   data = hd_trainset,
-                  trControl = control_rf,
-                  na.action = na.omit)
+                  na.action = na.omit,
+                  trControl=control_rf)
+print(train_rf)
+varImpPlot(train_rf$finalModel)
+# plotting the most important features and associated value, in decreasing importance
+plot(varImp(train_rf), top = 10)
 
-plot(train_rf)
-rpart.plot(train_rf$finalModel,   
-           type=5,
-           fallen.leaves = FALSE,
-           box.palette = "GnRd",
-           nn=TRUE)
+
+# predicting
+rf_results<-predict(train_rf,hd_valset,type ="prob")
+
+
+##### Regression Tree
+control_rt <- trainControl(method = "cv", number = 10, p = .9)
+train_rt <- train(presence ~ . ,
+                  method = "rpart",
+                  data = hd_trainset,
+                  trControl = control_rt,
+                  na.action = na.omit)
+rt_results<-predict(train_rt,hd_valset,type ="prob")
+
+
+keep_index<-complete.cases(hd_valset)
+reference<-hd_valset$presence[keep_index]
+
+#Using the RORc package to evaluate performance
+pred_glm<-prediction(glm_results$`Heart Disease`,reference)
+pred_knn<-prediction(knn_results$`Heart Disease`,reference)
+pred_rf<-prediction(rf_results$`Heart Disease`,reference)
+pred_rt<-prediction(rt_results$`Heart Disease`,reference)
+
+
+#ROC Area under the curve
+auc_glm = performance(pred_glm, 'auc')
+auc_knn = performance(pred_knn, 'auc')
+auc_rf = performance(pred_rf, 'auc')
+auc_rt = performance(pred_rt, 'auc')
+
+#Accuracies
+acc_glm = max(performance(pred_glm, 'acc')@y.values[[1]])
+acc_knn = max(performance(pred_knn, 'acc')@y.values[[1]])
+acc_rf = max(performance(pred_rf, 'acc')@y.values[[1]])
+acc_rt = max(performance(pred_rt, 'acc')@y.values[[1]])

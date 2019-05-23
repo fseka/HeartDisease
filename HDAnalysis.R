@@ -310,14 +310,21 @@ train_knn <- train(presence ~ sex+cp+fbs+exang+slope+ca+thal, method = "knn",dat
 knn_results<-predict(train_knn,hd_valset,type ="prob")
 
 ##### Random Forest
+
+set.seed(123)
 control_rf <- trainControl(method = "cv", number = 10, p = .9)
-train_rf <- train(presence ~ . ,
-                  method = "Rborist",
-                  tuneGrid = data.frame(predFixed = 2, minNode = c(3,10,25,35,40,45,50,60)),
+train_rf <- train(presence ~ sex+cp+fbs+exang+slope+ca+thal ,
+                  method = "rf",
                   data = hd_trainset,
-                  trControl = control_rf,
-                  na.action = na.omit)
-  
+                  na.action = na.omit,
+                  trControl=control_rf)
+print(train_rf)
+varImpPlot(train_rf$finalModel)
+# plotting the most important features and associated value, in decreasing importance
+plot(varImp(train_rf), top = 10)
+
+
+# predicting
 rf_results<-predict(train_rf,hd_valset,type ="prob")
 
 
@@ -378,7 +385,7 @@ sensispeci<-function(fittedModelResulti,fittedDataSet,threshold){
 }
 
 method_metrics<-function(fittedModelResult, fittedDataSet,ml_method){
-  k=seq(0.05,0.95,0.05)
+  k=seq(0,1,0.01)
   aocdata<-sapply(k,sensispeci,fittedModelResult=fittedModelResult,fittedDataSet=fittedDataSet)
   aocdata<-as.data.frame(cbind(k,t(aocdata)))
   aocdata$method<-ml_method
@@ -414,8 +421,8 @@ overall_metrics %>% group_by(Method) %>% ggplot(aes(x=Threshold,y=F1_score,label
 glm_metrics %>% ggplot(aes(x=1-Specificity,y=Sensitivity,label = Threshold)) +
   geom_line()  + 
   geom_point(shape = 21, fill = "red", color = "black", size=3) +
-  labs(x="1-specificity",y="Sensitivity") + 
-  geom_text_repel(nudge_x = 0.01, nudge_y = -0.01)
+  labs(x="1-specificity",y="Sensitivity") #+ 
+  #geom_text_repel(nudge_x = 0.01, nudge_y = -0.01)
 
 
 ## plot precision
@@ -439,5 +446,4 @@ glm_metrics %>% ggplot(aes(x=Threshold,y=Accuracy,label = Threshold)) +
   labs(x="Decision Threshold",y="Overall Accuracy") + 
   geom_text_repel(nudge_x = 0.01, nudge_y = -0.01)
 
-# Maximum accuracy achieved
-glm_metrics$Threshold[which.max(glm_metrics$Accuracy)]
+#TODO : add GAMLOESS, naive bayes, svm, lda, see caretList and caretEnsemble
