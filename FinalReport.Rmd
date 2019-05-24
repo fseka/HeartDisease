@@ -633,26 +633,23 @@ The accuracy provided by the regression tree algorithm is much lower than the ot
 
 In this section, we explore a group of learning methods to assess how GLM's performance compares. Using the lapply() function, it is possible to run the train function on a list of methods:
 
-"glm",
-"lda",
-"gamLoess",
-"gam", 
-"qda",
-"knn", 
-"kknn",
-"rf", 
-"svmRadial",
-"svmLinear", 
-"svmRadialCost", 
-"svmRadialSigma",
-"wsrf", 
-"Rborist", 
-"avNNet", 
-"mlp", 
-"monmlp",
-"adaboost", 
-"gbm", 
-"naive_bayes"
+* glm: generalized linear model
+* lda: Linear Discriminant Analysis
+* gamLoess, gam: generalized additive models
+* qda: Quadratic Discriminant Analysis
+* knn: K-nearest neighbours 
+* kknn: Weighted k-Nearest Neighbors
+* rf: Random Forerst
+* svmRadial, svmRadialCost,svmRadialSigma : Radial Support Vector Machines
+* svmLinear: Linear Support Vector Machines
+* wsrf: Weighted Subspace Random Forest
+* Rborist: Random forest
+* avNNet: Neural Networks
+* mlp: multilayer perceptron
+* monmlp: Multi-Layer Perceptron Neural Network with Optional Monotonicity
+* adaboost: Adaboost Algorithm
+* gbm: Generalized Boosted Regression 
+* naive bayes method
 
 For the purpose of consistency, the same train control parameters will be used.
 
