@@ -3,32 +3,21 @@ title: "Heart Disease Analysis Project"
 author: "Florian Seka"
 date: "16/05/2019"
 output:
-<<<<<<< HEAD
+  html_document:
+    df_print: paged
+    toc: yes
   pdf_document:
     toc: yes
     toc_depth: 4
     number_sections: true
     df_print: kable
-  html_document:
-    df_print: paged
-    toc: yes
-documentclass: report
-=======
-  html_document:
-    df_print: paged
-    toc: yes
-  pdf_document:
-    toc: yes
-  word_document:
-    toc: yes
->>>>>>> ae3eec0abe0fce753caf0353499790b483d49265
+    documentclass: report
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-<<<<<<< HEAD
 # Introduction
 
 ## Motivation and purpose
@@ -43,7 +32,7 @@ The subject chosen for this capstone project is the Heart Disease Data Set from 
 
 ## Executive summary
 
-After having determined the most important features in the dataset, and tested a variety of machine learning methods, the retained method was XXXXX. Applied to the validation data set, an ROC AUC of XXX could be achieved, corresponding to an accuracy of XXXX and the following confusion matrix: XXXX.
+After having determined the most important features in the dataset, and tested a variety of machine learning methods, the selected method was XXXXX. A total of XX methods were evaluated Applied to the validation data set, an ROC AUC of XXX could be achieved, with an accuracy of XXXX and the following confusion matrix: XXXX.
 
 
 ## Additionnal information
@@ -60,12 +49,10 @@ Ajouter un README sur github ou alors le rapport lui même.
 ### Executive summary
 ### Additionnal information
 Github link
->>>>>>> ae3eec0abe0fce753caf0353499790b483d49265
 
 
 ## Raw dataset description
 ### Data Source and structure
-<<<<<<< HEAD
 
 The data used for this experiment was created by four medical research entities:
 * Hungarian Institute of Cardiology.
@@ -108,26 +95,588 @@ i) Value 3: downsloping
 
 # Analysis
 
+
+
+## Used libraries
+
+The analysis and predictions will rely on the use of dedicated functions available in the following packages.
+
+```{r eval=T, message=F, warning=F, results='hide'}
+
+# Cleaning workspace
+rm(list=ls())
+# Loading the used libraries
+library(tidyverse)
+library(caret)
+library(ggrepel)
+library(ggthemes)
+library(mice)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+library(ROCR)
+library(mgcv)
+```
+
+
 ## Data preparation
+
+The data provided by the UCI repository first needs to be gathered and prepared. In a first step, the individual datasets from each research insitutes are appended to one another to build a complete dataset that will be used for the analysis.
+
+```{r eval=T, message=F, warning=F, results='hide'}
+
+datasetdir<-file.path(getwd(),"Data")
+datacolnames <- c("age","sex","cp","trestbps","chol","fbs","restecg","thalach","exang","oldpeak","slope","ca","thal","target") #defining the column names
+
+clevelanddata<-read.csv(file.path(datasetdir,"processed.cleveland.data"), header=FALSE)
+swissdata<-read.csv(file.path(datasetdir,"processed.switzerland.data"), header=FALSE)
+vadata<-read.csv(file.path(datasetdir,"processed.va.data"), header=FALSE)
+hungariandata<-read.csv(file.path(datasetdir,"processed.hungarian.data"), header=FALSE)
+
+#  assign the header names
+names(clevelanddata)<-datacolnames
+names(swissdata)<-datacolnames
+names(vadata)<-datacolnames
+names(hungariandata)<-datacolnames
+
+
+# before concatenating, adding one column to indicate origin of data
+clevelanddata<- mutate (clevelanddata, institute="Cleveland")
+swissdata<- mutate (swissdata, institute="Switzerland")
+vadata<- mutate (vadata, institute="Longbeach")
+hungariandata<- mutate (hungariandata, institute="Hungary")
+
+# build a unique dataset concatenating the rows from all previous 4 research institutes
+heartdisease<-rbind(clevelanddata,swissdata,vadata,hungariandata)
+
+
+# We can now remove the individual datasets and variables to free some workspace memory
+rm(clevelanddata,swissdata,vadata,hungariandata,datacolnames,datasetdir)
+
+```
+
+
+In this process, factors are added to the features based on the data description. This will later facilitate the creation and labelling of plots with the ggplot() package.
+
+```{r eval=T, message=F, warning=F, results='hide'}
+
+heartdisease$sex<-as.factor(heartdisease$sex)
+heartdisease$fbs<-as.factor(as.numeric(as.character(heartdisease$fbs)))
+heartdisease$exang<-as.factor(as.numeric(as.character(heartdisease$exang)))
+
+heartdisease$restecg<-as.factor(as.numeric(heartdisease$restecg))
+heartdisease$slope<-as.factor(as.numeric(as.character(heartdisease$slope)))
+heartdisease$thal<-as.factor(as.numeric(as.character(heartdisease$thal))) 
+heartdisease$ca<-as.factor(as.numeric(as.character(heartdisease$ca)))
+heartdisease$cp<-as.factor(as.numeric(as.character(heartdisease$cp)))
+
+heartdisease$institute<-as.factor(as.character(heartdisease$institute))
+
+levels(heartdisease$sex)[levels(heartdisease$sex)==0] <- "Female"
+levels(heartdisease$sex)[levels(heartdisease$sex)==1] <- "Male"
+
+levels(heartdisease$fbs)[levels(heartdisease$fbs)==0] <- "Fasting_Blood_Sugar_smaller_120"
+levels(heartdisease$fbs)[levels(heartdisease$fbs)==1] <- "Fasting_Blood_Sugar_greater_120"
+
+levels(heartdisease$exang)[levels(heartdisease$exang)==0] <- "No_Exercise_Induced_Angina"
+levels(heartdisease$exang)[levels(heartdisease$exang)==1] <- "Exercise_Induced_Angina"
+
+levels(heartdisease$restecg)[levels(heartdisease$restecg)==0] <- "REST_ECG_0"
+levels(heartdisease$restecg)[levels(heartdisease$restecg)==1] <- "REST_ECG_1"
+levels(heartdisease$restecg)[levels(heartdisease$restecg)==2] <- "REST_ECG_2"
+
+levels(heartdisease$cp)[levels(heartdisease$cp)==1] <- "ChestPaintype_1"
+levels(heartdisease$cp)[levels(heartdisease$cp)==2] <- "ChestPaintype_2"
+levels(heartdisease$cp)[levels(heartdisease$cp)==3] <- "ChestPaintype_3"
+levels(heartdisease$cp)[levels(heartdisease$cp)==4] <- "ChestPaintype_4"
+
+levels(heartdisease$slope)[levels(heartdisease$slope)==1] <- "Peak_Exercise_Slope_Upsloping"
+levels(heartdisease$slope)[levels(heartdisease$slope)==2] <- "Peak_Exercise_Slope_Flat"
+levels(heartdisease$slope)[levels(heartdisease$slope)==3] <- "Peak_Exercise_Slope_Downsloping"
+
+levels(heartdisease$thal)[levels(heartdisease$thal)==3] <- "Thalium_ST_normal"
+levels(heartdisease$thal)[levels(heartdisease$thal)==6] <- "Fixed_defect"
+levels(heartdisease$thal)[levels(heartdisease$thal)==7] <- "Reversible_defect"
+
+```
+
+With regard to the parameter that we will try to predict, we add a **presence** boolean column: the binary heart disease presence column is built based on the target column and is a simplification of the obersvation.
+While the target takes integer values from 0 to 4 (0 being the absolute absence of disease), this new value presence will indicate presence (presence=1,2,3or4) or absence (presence=0).
+
+```{r eval=T, message=F, warning=F, results='hide'}
+heartdisease <- mutate(heartdisease,presence=1*!(target==0))
+
+# Adding levels for the heart disease presence column
+heartdisease$presence<-as.factor(heartdisease$presence)
+levels(heartdisease$presence)[levels(heartdisease$presence)==0] <- "Healthy"
+levels(heartdisease$presence)[levels(heartdisease$presence)==1] <- "Heart Disease"
+
+# Converting numerical data to numeric format
+heartdisease$thalach<-as.numeric(heartdisease$thalach)
+heartdisease$trestbps<-as.numeric(heartdisease$trestbps)
+heartdisease$chol<-as.numeric(heartdisease$chol)
+heartdisease$oldpeak<-as.numeric(heartdisease$oldpeak)
+```
+
+
+We can visualize the distribution of patients depending on the contributing research institute:
+```{r eval=T, message=F, warning=F, results='hide', echo=FALSE}
+heartdisease %>% group_by(institute) %>% 
+  summarise(patients=n()) %>% 
+  ggplot() +
+  aes(institute,patients) +
+  geom_col(fill = c("blue", "red", "gray", "green")) + 
+  xlab("Research institute") +
+  ylab("Patient Count")
+```
+
+
+There is no predominant quantity of patients from a given institute, which is in favor of having merged all datasets together.
+
+## Building the training and validation
+
+The total count of samples in the dataset published by UCI is:
+
+```{r}
+nrow(heartdisease)
+```
+
+
+We will divide this data in 80% for the training set and 20% for the final validation.
+The feature exploration will then be carried out on the training set. Final performance evaluation will be carried out on the validation set.
+
+```{r}
+set.seed(2810)
+val_index <- createDataPartition(y=heartdisease$presence, times=1, p=0.2, list=FALSE)
+hd_trainset <- heartdisease[-val_index,] #defining the heart disease training data set
+hd_valset <- heartdisease[val_index,] #defining the heart disease validation data set
+```
+
 ## Feature exploration
+
+### Continuous features
+
+**Age:**
+```{r eval=T, message=F, warning=F, results='hide', echo=FALSE}
+hd_trainset %>%
+  ggplot() +
+  aes(age,fill=presence) +
+  geom_density(alpha = 0.4) +
+  xlab("Age") +
+  ylab("Density")
+```
+
+Age appears not to be a significant feature, as the healthy and heart disease distribute evenly over the ages.
+
+**Cholesterol:**
+
+```{r eval=T, message=F, warning=F, results='hide', echo=FALSE}
+hd_trainset %>% 
+  ggplot(aes(chol,fill=presence)) +
+  geom_density(alpha = 0.4) +
+  facet_wrap(~institute, ncol=1,scale="free_y")+
+  xlab("Serum cholestoral in mg/dl ") +
+  ylab("Density")
+```
+
+The cholesterol data reveals differences between research institutes, that could be probably explained by input errors. Regardless, the serum cholesterol does not appear to be significantly different between healthy and people suffering from heart disease. This feature will be discarded.
+
+
+**Trestbps Resting blood pressure (in mm Hg on admission to the hospital):**
+
+```{r eval=T, message=F, warning=F, results='hide', echo=FALSE}
+hd_trainset %>% 
+  ggplot(aes(trestbps,fill=presence)) +
+  geom_density(alpha = 0.4) +
+  facet_wrap(~institute, ncol=1,scale="free_y")+
+  xlab("Resting blood pressure in mm Hg") +
+  ylab("Density")
+```
+
+Resting blood pressure appears not to be a significant feature, as the healthy and heart disease distribute evenly over the pressure range.
+
+
+
+**Thalach maximum heart rate achieved :**
+
+```{r eval=T, message=F, warning=F, results='hide', echo=FALSE}
+hd_trainset %>% 
+  ggplot(aes(thalach,fill=presence)) +
+  geom_density(alpha = 0.4) +
+  facet_wrap(~institute, ncol=1,scale="free_y")+
+  xlab("maximum heart rate achieved") +
+  ylab("Density")
+```
+
+The Thalach maximum heart rate reveals some differences, as the healthy/Heart disease populations are shifted from one another. This observation is made for each research institute. This feature is therefore of interest and will be used in the fitting formula.
+
+
+**Oldpeak ST depression induced by exercise relative to rest:**
+
+```{r eval=T, message=F, warning=F, results='hide', echo=FALSE}
+hd_trainset %>% 
+  ggplot(aes(oldpeak,fill=presence)) +
+  geom_density(alpha = 0.4) +
+  facet_wrap(~institute, ncol=1,scale="free_y")+
+  xlab("Oldpeak ST depression induced by exercise relative to rest") +
+  ylab("Density")
+```
+
+The Oldpeak ST depression induced by exercise relative to rest seems not to be a differentiating factor in the data, based on the distributions plotted.
+
+### Categorical features
+
+**Patient sex:**
+```{r eval=T, message=F, warning=F, results='hide', echo=FALSE}
+hd_trainset %>%  
+  ggplot() +
+  aes(sex,fill=presence) +
+  geom_histogram(stat="count") +
+  scale_fill_manual(values=c("springgreen2","firebrick2"))
+```
+The visualisation tends to show that there is heart disease affect more men than women. Modifying the plotting script to show percentages confirms this observation.
+```{r eval=T, message=F, warning=F, results='hide', echo=FALSE}
+#Sex, in percentages
+hd_trainset %>%  group_by(sex,presence) %>% summarise(count=n()) %>% 
+  mutate(perc=count/sum(count))%>%
+  ggplot(aes(sex,y=perc,fill=presence)) +
+  geom_bar(stat="identity")+ 
+  scale_fill_manual(values=c("springgreen2","firebrick2"))+
+  ylab("Percentages")
+```
+The patient sex is a feature that will be kept in the fitting process, as it appears to be a determining factor.
+
+**Chest pain type:**
+
+```{r eval=T, message=F, warning=F, results='hide', echo=FALSE}
+# Chest pain type, in percentages
+hd_trainset %>%  filter(!is.na(cp)) %>% group_by(cp,presence) %>% summarise(count=n()) %>% 
+  mutate(perc=count/sum(count))%>%
+  ggplot(aes(cp,y=perc,fill=presence)) +
+  geom_bar(stat="identity")+ 
+  scale_fill_manual(values=c("springgreen2","firebrick2"))+
+  ylab("Percentages")
+```
+The type of chest pain is an interesting parameter, as the data reveals. Patient declaring a chest pain type of 4 are more likely to suffer from heart disease.
+
+**Fast blood sugar:**
+```{r eval=T, message=F, warning=F, results='hide', echo=FALSE}
+
+hd_trainset %>%  
+  ggplot() +
+  aes(fbs,fill=presence) +
+  geom_histogram(stat="count")+ 
+  scale_fill_manual(values=c("springgreen2","firebrick2"))
+```
+This parameter is a good example of disparity betweeen research institutes, where some of the them have not recorded this parameter. Nevertheless, when discarding the values that are unavailable, and looking at percentages rather than absolute values, we can see that Fast Blood Sugar is an important feature.
+
+```{r eval=T, message=F, warning=F, results='hide', echo=FALSE}
+hd_trainset %>%  filter(!is.na(fbs)) %>% group_by(fbs,presence) %>% summarise(count=n()) %>% 
+  mutate(perc=count/sum(count))%>%
+  ggplot(aes(fbs,y=perc,fill=presence)) +
+  geom_bar(stat="identity")+ 
+  scale_fill_manual(values=c("springgreen2","firebrick2"))+
+  ylab("Percentages")
+```
+
+**Rest ECG:**
+```{r eval=T, message=F, warning=F, results='hide', echo=FALSE}
+
+hd_trainset %>%  
+  ggplot() +
+  aes(restecg,fill=presence) +
+  geom_histogram(stat="count")+ 
+  scale_fill_manual(values=c("springgreen2","firebrick2"))
+```
+
+Rest ECG does not appear to be a determining feature, given the equirepartition of no disease/disease among the different levels. 
+
+**Exercise induced angina:**
+
+```{r eval=T, message=F, warning=F, results='hide', echo=FALSE}
+# Exercise induced angina , filtering out the N/As, in percentages
+hd_trainset %>%  filter(!is.na(exang)) %>% group_by(exang,presence) %>% summarise(count=n()) %>% 
+  mutate(perc=count/sum(count))%>%
+  ggplot(aes(exang,y=perc,fill=presence)) +
+  geom_bar(stat="identity")+ 
+  scale_fill_manual(values=c("springgreen2","firebrick2"))+
+  ylab("Percentages")
+```
+
+The patients affected by *Exercise induced angina* have a higher likelihood of having a heart disease. We will keep this parameter in the features used for the learning process.
+
+**The slope of the peak exercise ST segment:** 
+```{r eval=T, message=F, warning=F, results='hide', echo=FALSE}
+
+hd_trainset %>%  
+  ggplot() +
+  aes(presence,fill=slope) +
+  geom_histogram(stat="count")
+```
+
+A flat peak exercise slope appears to be an important factor in the determination of a heart disease.
+
+**Number of major vessels (0-3) colored by flourosopy:**
+
+```{r eval=T, message=F, warning=F, results='hide', echo=FALSE}
+hd_trainset %>%  filter(!is.na(ca)) %>% group_by(ca,presence) %>% summarise(count=n()) %>% 
+  mutate(perc=count/sum(count))%>%
+  ggplot(aes(ca,y=perc,fill=presence)) +
+  geom_bar(stat="identity")+ 
+  scale_fill_manual(values=c("springgreen2","firebrick2"))+
+  ylab("Percentages")
+```
+The plot reveals provides with a significant finding. The higher the number of major vessels colored by fluoroscopy is, the higher is the prevalence of heart disease affected patients. This parameter is definitely a feature to be considered in the analysis.
+
+**Thalium stress test result:**
+
+```{r eval=T, message=F, warning=F, results='hide', echo=FALSE}
+hd_trainset %>%  filter(!is.na(thal)) %>% group_by(thal,presence) %>% summarise(count=n()) %>% 
+  mutate(perc=count/sum(count))%>%
+  ggplot(aes(thal,y=perc,fill=presence)) +
+  geom_bar(stat="identity")+ 
+  scale_fill_manual(values=c("springgreen2","firebrick2"))+
+  ylab("Percentages")
+```
+
+The result of the thalium stress test is also a determining feature. The detection of a defect points to a higher proportion of heat disease affected people.
+
+## Conclusion - features selected for the learning process
+Based on the data analysis and visualisation provided above, the features that will be kept for the learning process are (in no particular order):
+
+1. **sex**: The patient sex 
+2. **cp**: Chest pain type (from 1 to 4, in 1 increments)
+3. **fbs**: (fasting blood sugar > 120 mg/dl) (1 = true; 0 = false)
+4. **exang**: exercise induced angina 
+5. **slope**: the slope of the peak exercise ST segment 
+6. **ca**: number of major vessels (0-3) colored by flourosopy 
+7. **thal**: Thalium stress test result : 3 = normal; 6 = fixed defect; 7 = reversable defect 
+
+
 ## Strategy and methods
+The approach will be to test four different methods and pick the one providing the best performance.
+The methods used will be:
+* GLM: Generalizd Linear Model
+* KNN: K-Nearest Neighbors
+* RF: random forest
+* RT: regression trees
+
+With regard to performance, we will predominently consider the receiver operating characteristic AUC (area under the curve). But accuracy will also be looked at, with the selection of decision threshold (the methods output probabilities in the prediction and it can be interesting to explore setting the decision threshold to a different value than the immediate and typical 0.5).
+
+In a second step, we will explore further machine learning techniques to fit the data. The objective is to see if other methods are able to further improve the results already achieved.
+
+All methods will be run with the same training control. The cross validation, with a fitting sampled set representing 90% of the training set. Cross validation will be done on 10  resampling iterations.
+
 ## Models evaluation
+### Generalized Linear Model
+
+
+
+```{r}
+control_glm <- trainControl(method = "cv", number = 10, p = .9)
+train_glm <- train(presence ~ sex+cp+fbs+exang+slope+ca+thal, method = "glm",family=binomial, data = hd_trainset,trControl = control_glm ,na.action = na.omit)
+glm_results<-predict(train_glm,hd_valset,type ="prob")
+```
+
+It can be interesting to see how accuracy evolves depending on the threshold chosen to separate positive (heart disease) from negative (healthy) populations. The data confirms that the traditionnal value of 0.5 is a good choice:
+```{r message=F, warning=F, results='hide',echo=FALSE}
+# accuracy calcuclation script
+hd_accuracy<-function(fittedModelResult,fittedModelTarget,threshold){
+  #accuracy calculation
+  mean(1*(fittedModelResult==fittedModelTarget))
+}
+
+#AOC UAC function script
+sensispeci<-function(fittedModelResulti,fittedDataSet,threshold){
+  
+  #Remove the NAs
+  keep_index<-complete.cases(fittedDataSet)
+  fittedModelResult<-as.numeric(fittedModelResulti)
+  fittedModelTarget<-fittedDataSet$presence[keep_index]
+  
+  #converting results in numeric format for evaluation
+  fittedModelResult<-ifelse(fittedModelResult>=threshold,2,1)
+  
+  # Adding levels for the heart disease presence column
+  fittedModelResult<-as.factor(fittedModelResult)
+  levels(fittedModelResult)[levels(fittedModelResult)==1] <- "Healthy"
+  levels(fittedModelResult)[levels(fittedModelResult)==2] <- "Heart Disease"
+  
+  #confusion Matrix and sensitivity/specificity calculation
+  u <- union(fittedModelResult, fittedModelTarget)
+  t <- table(factor(fittedModelResult, u), factor(fittedModelTarget, u))
+  conf_matrix<-confusionMatrix(t)$table
+  
+  output<-c(sensitivity(conf_matrix),specificity(conf_matrix),precision(conf_matrix),F_meas(conf_matrix),hd_accuracy(factor(fittedModelResult, u), factor(fittedModelTarget, u),threshold))
+}
+
+method_metrics<-function(fittedModelResult, fittedDataSet,ml_method){
+  k=seq(0,1,0.01)
+  aocdata<-sapply(k,sensispeci,fittedModelResult=fittedModelResult,fittedDataSet=fittedDataSet)
+  aocdata<-as.data.frame(cbind(k,t(aocdata)))
+  aocdata$method<-ml_method
+  aocdata<-setNames(aocdata,c("Threshold","Sensitivity","Specificity","Precision","F1_score","Accuracy","Method"))
+  }
+
+# Building method metrics
+glm_metrics<-method_metrics(glm_results$`Heart Disease`,hd_valset,"glm")
+```
+
+```{r eval=T, message=F, warning=F, results='hide', echo=FALSE}
+## Accuracy
+glm_metrics %>% ggplot(aes(x=Threshold,y=Accuracy,label = Threshold)) +
+  geom_line()  + 
+  geom_point(shape = 21, fill = "red", color = "black", size=3) +
+  labs(x="Decision Threshold",y="Overall Accuracy")
+```
+
+### K Nearest Neighbours
+
+```{r}
+control_knn <- trainControl(method = "cv", number = 10, p = .9)
+train_knn <- train(presence ~ sex+cp+fbs+exang+slope+ca+thal, method = "knn",data = hd_trainset,trControl = control_knn ,tuneGrid = data.frame(k=seq(1,20,1)),na.action = na.omit)
+knn_results<-predict(train_knn,hd_valset,type ="prob")
+```
+### Random Forest
+
+```{r}
+control_rf <- trainControl(method = "cv", number = 10, p = .9)
+train_rf <- train(presence ~ sex+cp+fbs+exang+slope+ca+thal ,
+                  method = "rf",
+                  data = hd_trainset,
+                  na.action = na.omit,
+                  trControl=control_rf)
+# predicting
+rf_results<-predict(train_rf,hd_valset,type ="prob")
+```
+
+The variable importance function provides interesting insights in the significant features that predominantly determine the presence/absence of disease:
+```{r}
+varImpPlot(train_rf$finalModel)
+# plotting the most important features and associated value, in decreasing importance
+plot(varImp(train_rf), top = 10)
+```
+
+The plots show that Chest Pain (type 4) and a Thalium Stress test with reversible defect are the most important factors in the prediction of heart disease. This is in line with our initial assumptions, when selecting the training parameters.
+
+
+### Regression Trees
+
+```{r}
+control_rt <- trainControl(method = "cv", number = 10, p = .9)
+train_rt <- train(presence ~ sex+cp+fbs+exang+slope+ca+thal ,
+                  method = "rpart",
+                  data = hd_trainset,
+                  trControl = control_rt,
+                  na.action = na.omit)
+rt_results<-predict(train_rt,hd_valset,type ="prob")
+```
+
+The resulting decision tree can be drawn usinf the rpart.plot package:
+
+```{r eval=T}
+rpart.plot(train_rt$finalModel,   
+           type=5,
+           fallen.leaves = FALSE,
+           box.palette = "GnRd",
+           nn=TRUE)
+```
+
+## Comparison of methods
+
+The ROCR package can be used to compare these four methods. In particular, ROR AUC and accuracy can be compared.
+```{r message=F, warning=F, results='hide',echo=FALSE}
+keep_index<-complete.cases(hd_valset)
+reference<-hd_valset$presence[keep_index]
+
+#Using the RORc package to evaluate performance
+pred_glm<-prediction(glm_results$`Heart Disease`,reference)
+pred_knn<-prediction(knn_results$`Heart Disease`,reference)
+pred_rf<-prediction(rf_results$`Heart Disease`,reference)
+pred_rt<-prediction(rt_results$`Heart Disease`,reference)
+
+
+#ROC Area under the curve
+auc_glm = performance(pred_glm, 'auc')@y.values[[1]]
+auc_knn = performance(pred_knn, 'auc')@y.values[[1]]
+auc_rf = performance(pred_rf, 'auc')@y.values[[1]]
+auc_rt = performance(pred_rt, 'auc')@y.values[[1]]
+
+#Accuracies
+acc_glm = max(performance(pred_glm, 'acc')@y.values[[1]])
+acc_knn = max(performance(pred_knn, 'acc')@y.values[[1]])
+acc_rf = max(performance(pred_rf, 'acc')@y.values[[1]])
+acc_rt = max(performance(pred_rt, 'acc')@y.values[[1]])
+
+```
+
+Providing following ROC AUCs:
+```{r message=F, warning=F,echo=FALSE}
+sim_methods=c("glm","knn","rf","rt")
+auc_summary=c(auc_glm,auc_knn,auc_rf,auc_rt)
+auc_results<-data_frame(Method = sim_methods, ROCAUC = auc_summary)
+library(knitr)
+kable(auc_results)
+```
+
+And with the following accuracies:
+```{r message=F, warning=F,echo=FALSE}
+accuracy_summary=c(acc_glm,acc_knn,acc_rf,acc_rt)
+acc_results<-data_frame(Method = sim_methods, Accuracy = accuracy_summary)
+library(knitr)
+kable(acc_results)
+```
+   
+The accuracy provided by the regression tree algorithm is much lower than the other approaches. While the KNN methods yields a better ROC AUC, the accuracy of the GLM method is much better for a ROC AUC that is not significantly smaller. The preferred method is therefore GLM. The next section explores additionnal methods to evaluate if the GLM results can be further improved.
+
+## Broader Model evaluation
+
+In this section, we explore a group of learning methods to assess how GLM's performance compares. Using the lapply() function, it is possible to run the train function on a list of methods:
+
+"glm",
+"lda",
+"gamLoess",
+"gam", 
+"qda",
+"knn", 
+"kknn",
+"rf", 
+"svmRadial",
+"svmLinear", 
+"svmRadialCost", 
+"svmRadialSigma",
+"wsrf", 
+"Rborist", 
+"avNNet", 
+"mlp", 
+"monmlp",
+"adaboost", 
+"gbm", 
+"naive_bayes"
+
+For the purpose of consistency, the same train control parameters will be used.
+
+```{r message=F, warning=F, include=FALSE, results='hide'}
+keep_index<-complete.cases(hd_trainset)
+hd_trainset<-hd_trainset[keep_index,]
+```
+
+```{r echo=FALSE, message=F, warning=F, results='hide'}
+control_train <- trainControl(method = "cv", number = 10, p = .9)
+ models <- c("glm","lda", "gamLoess", "gam", "qda","knn", "kknn",
+             "rf", "svmRadial", "svmLinear", "svmRadialCost", "svmRadialSigma",
+             "wsrf", "Rborist", "avNNet", "mlp", "monmlp","adaboost", "gbm", "naive_bayes" )
+
+
+fits <- lapply(models, function(model){ 
+  print(model)
+  train(presence ~ sex+cp+fbs+exang+slope+ca+thal, method = model, data = hd_trainset,trControl = control_train ,na.action = na.omit)
+}) 
+names(fits) <- models
+```
 
 # Final Results
-# Conclusions and further investigation
+# Conclusions and further investigations
 # References and Credits
-=======
-### Feature description
 
-## Analysis
-
-### Data preparation
-### Feature exploration
-### Strategy and methods
-### Models evaluation
-
-## Final Results
-## Conclusions
-## References and Credits
->>>>>>> ae3eec0abe0fce753caf0353499790b483d49265
 Ajouter le nom des personnes à mentionner concernant l'origine des données.

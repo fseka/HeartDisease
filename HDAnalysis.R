@@ -12,6 +12,8 @@ library(ggrepel)
 library(randomForest)
 library(rpart)
 library(rpart.plot)
+library(ROCR)
+library(mgcv)
 
 
 datasetdir<-file.path(getwd(),"Data")
@@ -64,28 +66,28 @@ heartdisease$institute<-as.factor(as.character(heartdisease$institute))
 levels(heartdisease$sex)[levels(heartdisease$sex)==0] <- "Female"
 levels(heartdisease$sex)[levels(heartdisease$sex)==1] <- "Male"
 
-levels(heartdisease$fbs)[levels(heartdisease$fbs)==0] <- "Fasting Blood Sugar <= 120"
-levels(heartdisease$fbs)[levels(heartdisease$fbs)==1] <- "Fasting Blood Sugar > 120"
+levels(heartdisease$fbs)[levels(heartdisease$fbs)==0] <- "Fasting_Blood_Sugar_smaller_120"
+levels(heartdisease$fbs)[levels(heartdisease$fbs)==1] <- "Fasting_Blood_Sugar_greater_120"
 
-levels(heartdisease$exang)[levels(heartdisease$exang)==0] <- "No Exercise Induced Angina"
-levels(heartdisease$exang)[levels(heartdisease$exang)==1] <- "Exercise Induced Angina"
+levels(heartdisease$exang)[levels(heartdisease$exang)==0] <- "No_Exercise_Induced_Angina"
+levels(heartdisease$exang)[levels(heartdisease$exang)==1] <- "Exercise_Induced_Angina"
 
-levels(heartdisease$restecg)[levels(heartdisease$restecg)==0] <- "REST ECG 0"
-levels(heartdisease$restecg)[levels(heartdisease$restecg)==1] <- "REST ECG 1"
-levels(heartdisease$restecg)[levels(heartdisease$restecg)==2] <- "REST ECG 2"
+levels(heartdisease$restecg)[levels(heartdisease$restecg)==0] <- "REST_ECG_0"
+levels(heartdisease$restecg)[levels(heartdisease$restecg)==1] <- "REST_ECG_1"
+levels(heartdisease$restecg)[levels(heartdisease$restecg)==2] <- "REST_ECG_2"
 
-levels(heartdisease$cp)[levels(heartdisease$cp)==1] <- "Chest Pain type 1"
-levels(heartdisease$cp)[levels(heartdisease$cp)==2] <- "Chest Pain type 2"
-levels(heartdisease$cp)[levels(heartdisease$cp)==3] <- "Chest Pain type 3"
-levels(heartdisease$cp)[levels(heartdisease$cp)==4] <- "Chest Pain type 4"
+levels(heartdisease$cp)[levels(heartdisease$cp)==1] <- "ChestPaintype_1"
+levels(heartdisease$cp)[levels(heartdisease$cp)==2] <- "ChestPaintype_2"
+levels(heartdisease$cp)[levels(heartdisease$cp)==3] <- "ChestPaintype_3"
+levels(heartdisease$cp)[levels(heartdisease$cp)==4] <- "ChestPaintype_4"
 
-levels(heartdisease$slope)[levels(heartdisease$slope)==1] <- "Peak Exercise Slope Upsloping"
-levels(heartdisease$slope)[levels(heartdisease$slope)==2] <- "Peak Exercise Slope Flat"
-levels(heartdisease$slope)[levels(heartdisease$slope)==3] <- "Peak Exercise Slope Downsloping"
+levels(heartdisease$slope)[levels(heartdisease$slope)==1] <- "Peak_Exercise_Slope_Upsloping"
+levels(heartdisease$slope)[levels(heartdisease$slope)==2] <- "Peak_Exercise_Slope_Flat"
+levels(heartdisease$slope)[levels(heartdisease$slope)==3] <- "Peak_Exercise_Slope_Downsloping"
 
-levels(heartdisease$thal)[levels(heartdisease$thal)==3] <- "Thalium ST normal"
-levels(heartdisease$thal)[levels(heartdisease$thal)==6] <- "Fixed defect"
-levels(heartdisease$thal)[levels(heartdisease$thal)==7] <- "Reversible defect"
+levels(heartdisease$thal)[levels(heartdisease$thal)==3] <- "Thalium_ST_normal"
+levels(heartdisease$thal)[levels(heartdisease$thal)==6] <- "Fixed_defect"
+levels(heartdisease$thal)[levels(heartdisease$thal)==7] <- "Reversible_defect"
 
 # Adding the presence boolean column: the binary heart disease presence column is built based on the presence column and is a simplification of the obersvation.
 # While the presence takes integer values from 0 to 4 (0 being the absolute absence of disease), this new value presence will indicate presence (presence=1,2,3or4) or absence (presence=0).
@@ -127,6 +129,7 @@ set.seed(2810)
 val_index <- createDataPartition(y=heartdisease$presence, times=1, p=0.2, list=FALSE)
 hd_trainset <- heartdisease[-val_index,] #defining the heart disease training data set
 hd_valset <- heartdisease[val_index,] #defining the heart disease validation data set
+
 
 ## Feature exploration
 # It is now possible to look closely to the different features in the training set. This first exploration will be carried out by means of data visualisation.
@@ -285,22 +288,17 @@ hd_trainset %>%  filter(!is.na(thal)) %>% group_by(thal,presence) %>% summarise(
   scale_fill_manual(values=c("springgreen2","firebrick2"))+
   ylab("Percentages")
 
-# We are facing the issue that some of the features that seem to be important contain a non negligible number of NAs. Here are some statistics:
 round(colSums(is.na(hd_trainset))*100/nrow(hd_trainset),0)
-
-# the slope, ca and thal data features are particularly scarce and we will have to be careful when chosing the right prediction method to avoid bad data fitting.
-
 
 hd_trainset$institute <- NULL
 hd_trainset$target <- NULL
 hd_valset$institute <- NULL
-log<-glm(presence ~ sex+cp+fbs+exang+slope+ca+thal, data=hd_trainset, family=binomial, na.action = na.omit)
 
+# Fitting
+set.seed(123)
 ##### GLM method
 control_glm <- trainControl(method = "cv", number = 10, p = .9)
 train_glm <- train(presence ~ sex+cp+fbs+exang+slope+ca+thal, method = "glm",family=binomial, data = hd_trainset,trControl = control_glm ,na.action = na.omit)
-
-#glm_results<-predict(log,hd_valset,type ="response")
 glm_results<-predict(train_glm,hd_valset,type ="prob")
 
 ##### KNN method
@@ -311,7 +309,6 @@ knn_results<-predict(train_knn,hd_valset,type ="prob")
 
 ##### Random Forest
 
-set.seed(123)
 control_rf <- trainControl(method = "cv", number = 10, p = .9)
 train_rf <- train(presence ~ sex+cp+fbs+exang+slope+ca+thal ,
                   method = "rf",
@@ -329,8 +326,9 @@ rf_results<-predict(train_rf,hd_valset,type ="prob")
 
 
 ##### Regression Tree
+
 control_rt <- trainControl(method = "cv", number = 10, p = .9)
-train_rt <- train(presence ~ . ,
+train_rt <- train(presence ~ sex+cp+fbs+exang+slope+ca+thal ,
                   method = "rpart",
                   data = hd_trainset,
                   trControl = control_rt,
@@ -344,6 +342,28 @@ rpart.plot(train_rt$finalModel,
            box.palette = "GnRd",
            nn=TRUE)
 
+## Use of the ROR C package
+keep_index<-complete.cases(hd_valset)
+reference<-hd_valset$presence[keep_index]
+
+#Using the RORc package to evaluate performance
+pred_glm<-prediction(glm_results$`Heart Disease`,reference)
+pred_knn<-prediction(knn_results$`Heart Disease`,reference)
+pred_rf<-prediction(rf_results$`Heart Disease`,reference)
+pred_rt<-prediction(rt_results$`Heart Disease`,reference)
+
+
+#ROC Area under the curve
+auc_glm = performance(pred_glm, 'auc')@y.values[[1]]
+auc_knn = performance(pred_knn, 'auc')@y.values[[1]]
+auc_rf = performance(pred_rf, 'auc')@y.values[[1]]
+auc_rt = performance(pred_rt, 'auc')@y.values[[1]]
+
+#Accuracies
+acc_glm = max(performance(pred_glm, 'acc')@y.values[[1]])
+acc_knn = max(performance(pred_knn, 'acc')@y.values[[1]])
+acc_rf = max(performance(pred_rf, 'acc')@y.values[[1]])
+acc_rt = max(performance(pred_rt, 'acc')@y.values[[1]])
 
 
 # accuracy calcuclation script
@@ -356,10 +376,6 @@ hd_accuracy<-function(fittedModelResult,fittedModelTarget,threshold){
 sensispeci<-function(fittedModelResulti,fittedDataSet,threshold){
   
   #Remove the NAs
-  #keep_index<-complete.cases(fittedDataSet)
-  #fittedModelResult<-fittedModelResult[keep_index]
-  #fittedModelTarget<-fittedDataSet$presence[keep_index]
-  
   keep_index<-complete.cases(fittedDataSet)
   fittedModelResult<-as.numeric(fittedModelResulti)
   fittedModelTarget<-fittedDataSet$presence[keep_index]
@@ -373,15 +389,11 @@ sensispeci<-function(fittedModelResulti,fittedDataSet,threshold){
   levels(fittedModelResult)[levels(fittedModelResult)==2] <- "Heart Disease"
   
   #confusion Matrix and sensitivity/specificity calculation
-  #conf_matrix<-table(fittedModelResult,fittedModelTarget)
   u <- union(fittedModelResult, fittedModelTarget)
   t <- table(factor(fittedModelResult, u), factor(fittedModelTarget, u))
   conf_matrix<-confusionMatrix(t)$table
   
-  output<-c(sensitivity(conf_matrix),specificity(conf_matrix),precision(conf_matrix),F_meas(conf_matrix),hd_accuracy(factor(fittedModelResult, u), factor(fittedModelTarget, u),threshold))#
-  #output<-c(sensitivity(conf_matrix),specificity(conf_matrix),precision(conf_matrix),F_meas(conf_matrix),hd_accuracy(fittedModelResult,fittedModelTarget,threshold))#
-  #output<-data.frame("Sensitivity"=sensitivity(conf_matrix),"Specificity"=specificity(conf_matrix),"Precision"=precision(conf_matrix),"F_meas"=F_meas(conf_matrix))
-  
+  output<-c(sensitivity(conf_matrix),specificity(conf_matrix),precision(conf_matrix),F_meas(conf_matrix),hd_accuracy(factor(fittedModelResult, u), factor(fittedModelTarget, u),threshold))
 }
 
 method_metrics<-function(fittedModelResult, fittedDataSet,ml_method){
@@ -446,4 +458,37 @@ glm_metrics %>% ggplot(aes(x=Threshold,y=Accuracy,label = Threshold)) +
   labs(x="Decision Threshold",y="Overall Accuracy") + 
   geom_text_repel(nudge_x = 0.01, nudge_y = -0.01)
 
-#TODO : add GAMLOESS, naive bayes, svm, lda, see caretList and caretEnsemble
+
+
+##### Larger methods assessment
+
+## Removing NAs from the training set
+keep_index<-complete.cases(hd_trainset)
+hd_trainset<-hd_trainset2[keep_index,]
+
+
+# Models
+
+control_train <- trainControl(method = "cv", number = 10, p = .9)
+models <- c("glm","lda", "gamLoess", "gam", "qda","knn", "kknn",
+            "rf", "svmRadial", "svmLinear", "svmRadialCost", "svmRadialSigma",
+            "wsrf", "Rborist", "avNNet", "mlp", "monmlp","adaboost", "gbm", "naive_bayes" )
+
+
+
+fits <- lapply(models, function(model){ 
+  print(model)
+  train(presence ~ sex+cp+fbs+exang+slope+ca+thal, method = model, data = hd_trainset,trControl = control_train ,na.action = na.omit)
+}) 
+names(fits) <- models
+
+
+keep_index<-complete.cases(hd_valset)
+hd_valset<-hd_valset[keep_index,]
+
+# prediction
+pred <- sapply(fits, function(object) 
+  predict(object, newdata = hd_valset))
+dim(pred)
+
+acc <- colMeans(pred == hd_valset$presence)

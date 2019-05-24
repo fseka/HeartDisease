@@ -13,6 +13,7 @@ library(randomForest)
 library(rpart)
 library(rpart.plot)
 library(ROCR)
+library(mgcv)
 
 
 datasetdir<-file.path(getwd(),"Data")
@@ -65,28 +66,28 @@ heartdisease$institute<-as.factor(as.character(heartdisease$institute))
 levels(heartdisease$sex)[levels(heartdisease$sex)==0] <- "Female"
 levels(heartdisease$sex)[levels(heartdisease$sex)==1] <- "Male"
 
-levels(heartdisease$fbs)[levels(heartdisease$fbs)==0] <- "Fasting Blood Sugar <= 120"
-levels(heartdisease$fbs)[levels(heartdisease$fbs)==1] <- "Fasting Blood Sugar > 120"
+levels(heartdisease$fbs)[levels(heartdisease$fbs)==0] <- "Fasting_Blood_Sugar_smaller_120"
+levels(heartdisease$fbs)[levels(heartdisease$fbs)==1] <- "Fasting_Blood_Sugar_greater_120"
 
-levels(heartdisease$exang)[levels(heartdisease$exang)==0] <- "No Exercise Induced Angina"
-levels(heartdisease$exang)[levels(heartdisease$exang)==1] <- "Exercise Induced Angina"
+levels(heartdisease$exang)[levels(heartdisease$exang)==0] <- "No_Exercise_Induced_Angina"
+levels(heartdisease$exang)[levels(heartdisease$exang)==1] <- "Exercise_Induced_Angina"
 
-levels(heartdisease$restecg)[levels(heartdisease$restecg)==0] <- "REST ECG 0"
-levels(heartdisease$restecg)[levels(heartdisease$restecg)==1] <- "REST ECG 1"
-levels(heartdisease$restecg)[levels(heartdisease$restecg)==2] <- "REST ECG 2"
+levels(heartdisease$restecg)[levels(heartdisease$restecg)==0] <- "REST_ECG_0"
+levels(heartdisease$restecg)[levels(heartdisease$restecg)==1] <- "REST_ECG_1"
+levels(heartdisease$restecg)[levels(heartdisease$restecg)==2] <- "REST_ECG_2"
 
-levels(heartdisease$cp)[levels(heartdisease$cp)==1] <- "Chest Pain type 1"
-levels(heartdisease$cp)[levels(heartdisease$cp)==2] <- "Chest Pain type 2"
-levels(heartdisease$cp)[levels(heartdisease$cp)==3] <- "Chest Pain type 3"
-levels(heartdisease$cp)[levels(heartdisease$cp)==4] <- "Chest Pain type 4"
+levels(heartdisease$cp)[levels(heartdisease$cp)==1] <- "ChestPaintype_1"
+levels(heartdisease$cp)[levels(heartdisease$cp)==2] <- "ChestPaintype_2"
+levels(heartdisease$cp)[levels(heartdisease$cp)==3] <- "ChestPaintype_3"
+levels(heartdisease$cp)[levels(heartdisease$cp)==4] <- "ChestPaintype_4"
 
-levels(heartdisease$slope)[levels(heartdisease$slope)==1] <- "Peak Exercise Slope Upsloping"
-levels(heartdisease$slope)[levels(heartdisease$slope)==2] <- "Peak Exercise Slope Flat"
-levels(heartdisease$slope)[levels(heartdisease$slope)==3] <- "Peak Exercise Slope Downsloping"
+levels(heartdisease$slope)[levels(heartdisease$slope)==1] <- "Peak_Exercise_Slope_Upsloping"
+levels(heartdisease$slope)[levels(heartdisease$slope)==2] <- "Peak_Exercise_Slope_Flat"
+levels(heartdisease$slope)[levels(heartdisease$slope)==3] <- "Peak_Exercise_Slope_Downsloping"
 
-levels(heartdisease$thal)[levels(heartdisease$thal)==3] <- "Thalium ST normal"
-levels(heartdisease$thal)[levels(heartdisease$thal)==6] <- "Fixed defect"
-levels(heartdisease$thal)[levels(heartdisease$thal)==7] <- "Reversible defect"
+levels(heartdisease$thal)[levels(heartdisease$thal)==3] <- "Thalium_ST_normal"
+levels(heartdisease$thal)[levels(heartdisease$thal)==6] <- "Fixed_defect"
+levels(heartdisease$thal)[levels(heartdisease$thal)==7] <- "Reversible_defect"
 
 # Adding the presence boolean column: the binary heart disease presence column is built based on the presence column and is a simplification of the obersvation.
 # While the presence takes integer values from 0 to 4 (0 being the absolute absence of disease), this new value presence will indicate presence (presence=1,2,3or4) or absence (presence=0).
@@ -185,3 +186,41 @@ acc_glm = max(performance(pred_glm, 'acc')@y.values[[1]])
 acc_knn = max(performance(pred_knn, 'acc')@y.values[[1]])
 acc_rf = max(performance(pred_rf, 'acc')@y.values[[1]])
 acc_rt = max(performance(pred_rt, 'acc')@y.values[[1]])
+
+
+##### Larger methods assessment
+
+## Removing NAs from the training set
+keep_index<-complete.cases(hd_trainset)
+hd_trainset<-hd_trainset[keep_index,]
+
+
+# Models
+
+control_train <- trainControl(method = "cv", number = 10, p = .9)
+ models <- c("glm","lda", "gamLoess", "gam", "qda","knn", "kknn",
+             "rf", "svmRadial", "svmLinear", "svmRadialCost", "svmRadialSigma",
+             "wsrf", "Rborist", "avNNet", "mlp", "monmlp","adaboost", "gbm", "naive_bayes" )
+
+
+fits <- lapply(models, function(model){ 
+  print(model)
+  train(presence ~ sex+cp+fbs+exang+slope+ca+thal, method = model, data = hd_trainset,trControl = control_train ,na.action = na.omit)
+}) 
+names(fits) <- models
+
+
+keep_index<-complete.cases(hd_valset)
+hd_valset<-hd_valset[keep_index,]
+
+# prediction
+pred <- sapply(fits, function(object) 
+  predict(object, newdata = hd_valset))
+dim(pred)
+
+acc <- colMeans(pred == hd_valset$presence)
+
+
+votes <- rowMeans(pred == "Heart Disease")
+y_hat <- ifelse(votes > 0.5, "Heart Disease", "Healthy")
+mean(y_hat == hd_valset$presence)
