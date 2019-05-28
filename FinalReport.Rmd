@@ -27,7 +27,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Project Presentation
 
-The subject chosen for this capstone project is the Heart Disease Data Set from the UCI Machine learning repository. This dataset gathers data from four different medical institution and provides, for each patient, a number of attributes, as well as a measure of heart disease presence (from "no presence" to different levels of presence). Our objective will be to predict, given a patients set of attributes (medical parameters), the presence or absence of medical disease.
+The subject chosen for this capstone project is the Heart Disease Data Set from the UCI Machine learning repository. This dataset gathers data from four different medical institutions and provides, for each patient, a number of attributes, as well as a measure of heart disease presence (from "no presence" to different levels of presence). Our objective will be to predict, given a patients set of attributes (medical parameters), the presence or absence of medical disease.
 
 This dataset has also been used in Data Science competitions such as Kagle. However, only the processed data from the Cleveland Clinic Foundation was used. Our study attempts to carry the data analysis on the concatenation of all datasets made available on the UC Irvine Machine Learning Repository.
 
@@ -46,7 +46,7 @@ After having determined the most important features in the dataset, and tested a
 
 ## Additionnal information
 
-The analysis was carried out using the R langauge in the R Studio developement environment. All scripts and data in support of this project are available for download from a dedicated version control repository:
+The analysis was carried out using the R language in the R Studio developement environment. All scripts and data in support of this project are available for download from a dedicated version control repository:
 
 https://github.com/fseka/HeartDisease
 
@@ -478,7 +478,7 @@ The methods used will be:
 * RF: random forest
 * RT: regression trees
 
-With regard to performance, we will predominently consider the receiver operating characteristic AUC (area under the curve). But accuracy will also be looked at, with the selection of decision threshold (the methods output probabilities in the prediction and it can be interesting to explore setting the decision threshold to a different value than the immediate and typical 0.5).
+With regard to performance, we will consider the receiver operating characteristic AUC (area under the curve) and accuracy. But accuracy will also be looked at, with the selection of decision threshold (the methods output probabilities in the prediction and it can be interesting to explore setting the decision threshold to a different value than the immediate and typical 0.5).
 
 In a second step, we will explore further machine learning techniques to fit the data. The objective is to see if other methods are able to further improve the results already achieved.
 
@@ -756,13 +756,13 @@ When the models are run over the validation data set, we see that the gamLoess a
 
 This exploration confirms that the GLM method is well suited for this data set experiment.
 
-## An exploration: approaching the missing data
+# An exploration: approaching the missing data
 
 Up to now, we have been carefull to discard from the training and validation data, all rows from the Heart Disease dataset that contained "NAs". In this section, we will explore a data imputation method and assess the obtained accuracy. The MICE package will be used to complete the datasets. For the purpose of this exploration, only the selected method (GLM) will be used to train the model with the imputed data.
 
 A reasonable assumption in using the MICE package is to consider the data is missing at random.
 
-### Visualisation of the missing data
+## Visualisation of the missing data
 Before training the model, it is possible to visualize the missing data, provifing insights on which features in the datasets are particularily scarce.
 We will use a function provided by the VIM package.
 
@@ -773,7 +773,7 @@ aggr_plot <- aggr(hd_trainset, col=c('navyblue','red'), numbers=TRUE,
                   gap=3, ylab=c("Histogram of missing data","Pattern"))
 ```
 
-### Imputing the data and training the GLM model
+## Imputing the data and training the GLM model
 ```{r eval=T, message=F, warning=F, results='hide', echo=TRUE}
 ## Imputing the missing data
 impResult<-mice(data = hd_trainset, m = 5, method = "pmm", maxit = 50, seed = 500)
@@ -791,7 +791,7 @@ fits <- lapply(models, function(model){
 }) 
 names(fits) <- models
 ```
-### Completing the validation data set and predicting the disease presence
+## Completing the validation data set and predicting the disease presence
 
 Now that the model is trained, the validation data set needs first to be completed as well, as this data sets also misses data. We will use the same approach as for the training data set, relying on the MICE data set with the same parameters.
 
