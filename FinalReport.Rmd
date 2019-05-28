@@ -1,7 +1,7 @@
 ---
 title: "Heart Disease Analysis Project"
 author: "Florian Seka"
-date: "16/05/2019"
+date: "28/05/2019"
 output:
   html_document:
     df_print: paged
@@ -22,9 +22,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Motivation and purpose
 
-The purpose of this report is to document the various strategies investigated in the frame of the data science capstone final project, in partial fulfillment of the requirements for the EDX Harvard Data Science Professional Certificate.
+The purpose of this report is to document the various strategies investigated in the frame of the data science capstone final project, in partial fulfilment of the requirements for the EDX Harvard Data Science Professional Certificate.
 
-In the first part of the report, information is briefly given about the structuring and preparation of the data used to build and evaluate the machine learning algorithms, as well as the different methods that will be developped to achieve the best possible final result. In the second part, the final, optimized, algorithm is selected and tested against the validation dataset.
+In the first part of the report, information is briefly given about the structuring and preparation of the data used to build and evaluate the machine learning algorithms, as well as the different methods that will be developed to achieve the best possible final result. In the second part, the final, optimised, algorithm is selected and tested against the validation dataset.
 
 ## Project Presentation
 

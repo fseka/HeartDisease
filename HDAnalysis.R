@@ -29,6 +29,13 @@ library(rpart.plot)
 library(ROCR)
 library(mgcv)
 library(VIM)
+library(knitr)
+
+# Checking presence of required packages. If not present, 
+list.of.packages <- c("tidyverse", "caret", "ggthemes","mice","ggrepel","randomForest","rpart","rpart.plot", "ROCR","mgcv","VIM","knitr")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+
 
 # Data preparation ----
 datasetdir<-file.path(getwd(),"Data")
@@ -504,7 +511,7 @@ training_acc<-as.data.frame(training_acc)
 training_acc[2]<-round(as.numeric(as.character(unlist(training_acc[2]))),4)
 names(training_acc)<-c("Method","Accuracy over training set")
 # displaying the results
-library(knitr)
+
 kable(training_acc %>% arrange(desc(`Accuracy over training set`)))
 
 # predictions on the validation test set, 
@@ -559,7 +566,7 @@ training_acc<-as.data.frame(training_acc)
 training_acc[2]<-round(as.numeric(as.character(unlist(training_acc[2]))),4)
 names(training_acc)<-c("Method","Accuracy over training set")
 # displaying the results
-library(knitr)
+
 kable(training_acc %>% arrange(desc(`Accuracy over training set`)))
 
 # prediction on validation test set
