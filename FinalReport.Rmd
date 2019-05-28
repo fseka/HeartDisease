@@ -3,15 +3,15 @@ title: "Heart Disease Analysis Project"
 author: "Florian Seka"
 date: "16/05/2019"
 output:
+  html_document:
+    df_print: paged
+    toc: yes
+  documentclass: report
   pdf_document:
     toc: yes
     toc_depth: 4
     number_sections: true
     df_print: kable
-  documentclass: report
-  html_document:
-    df_print: paged
-    toc: yes
 ---
 
 ```{r setup, include=FALSE}
@@ -108,6 +108,7 @@ library(rpart)
 library(rpart.plot)
 library(ROCR)
 library(mgcv)
+library(VIM)
 ```
 
 
@@ -469,8 +470,6 @@ All methods will be run with the same training control. The cross validation, wi
 ## Models evaluation
 ### Generalized Linear Model
 
-
-
 ```{r}
 control_glm <- trainControl(method = "cv", number = 10, p = .9)
 train_glm <- train(presence ~ sex+cp+fbs+exang+slope+ca+thal, method = "glm",family=binomial, data = hd_trainset,trControl = control_glm ,na.action = na.omit)
@@ -654,25 +653,161 @@ For the purpose of consistency, the same train control parameters will be used.
 
 ```{r message=F, warning=F, include=FALSE, results='hide'}
 keep_index<-complete.cases(hd_trainset)
-hd_trainset<-hd_trainset[keep_index,]
+hd_trainset_noNAs<-hd_trainset[keep_index,]
+
 ```
 
 ```{r echo=FALSE, message=F, warning=F, results='hide'}
+
+# Defining the train control parameters
 control_train <- trainControl(method = "cv", number = 10, p = .9)
- models <- c("glm","lda", "gamLoess", "gam", "qda","knn", "kknn",
-             "rf", "svmRadial", "svmLinear", "svmRadialCost", "svmRadialSigma",
-             "wsrf", "Rborist", "avNNet", "mlp", "monmlp","adaboost", "gbm", "naive_bayes" )
+
+# Training the models
+models <- c("glm","lda", "gamLoess", "gam", "qda","knn", "kknn",
+            "rf", "svmRadial", "svmLinear", "svmRadialCost", "svmRadialSigma",
+            "wsrf", "Rborist", "avNNet", "mlp", "monmlp","adaboost", "gbm", "naive_bayes" )
+
 
 
 fits <- lapply(models, function(model){ 
   print(model)
-  train(presence ~ sex+cp+fbs+exang+slope+ca+thal, method = model, data = hd_trainset,trControl = control_train ,na.action = na.omit)
+  train(presence ~ sex+cp+fbs+exang+slope+ca+thal, method = model, data = hd_trainset_noNAs,trControl = control_train ,na.action = na.omit)
 }) 
+
+# Labelling the fits with the method name
 names(fits) <- models
+
 ```
 
 # Final Results
-# Conclusions and further investigations
+```{r echo=FALSE, message=F, warning=F, results='hide'}
+#pre allocate training accuracy matrix
+training_acc<-matrix(NA,nrow=length(models),ncol=2) 
+
+# for loop to populate matrix with the results
+for(i in seq(1,length(models),1)){
+  training_acc[i,1]<-models[i]
+  training_acc[i,2]<-fits[[i]]$results$Accuracy[1]
+}
+# formatting the dataframe
+training_acc<-as.data.frame(training_acc)
+training_acc[2]<-round(as.numeric(as.character(unlist(training_acc[2]))),4)
+names(training_acc)<-c("Method","Accuracy over training set")
+```
+
+The result from the training can be summarized in the following table which provides the method's accuracy over the training data set:
+
+```{r message=F, warning=F,echo=FALSE}
+kable(training_acc %>% arrange(desc(`Accuracy over training set`)))
+```
+
+Here are the achieved accuracies over the validation test set:
+
+```{r echo=FALSE, message=F, warning=F, results='hide'}
+# predictions on the validation test set, 
+## first we remove the NAs in the validation data
+keep_index<-complete.cases(hd_valset)
+hd_valset_noNAs<-hd_valset[keep_index,]
+
+## then we predict the disease
+pred <- sapply(fits, function(object) 
+  predict(object, newdata = hd_valset_noNAs))
+dim(pred)
+
+validation_acc <- colMeans(pred == hd_valset_noNAs$presence)
+# formatting the dataframe
+validation_acc<-as.data.frame(unname(validation_acc))
+validation_acc<-cbind(models,validation_acc)
+names(validation_acc)<-c("Method","Accuracy over validation set")
+```
+
+With regard to the training set, it is interesting to see that a number of methods provide similar results, with our selected method GLM not scoring the highest figure. The Rborist method does not provide good results at all.
+
+```{r message=F, warning=F,echo=FALSE}
+kable(validation_acc %>% arrange(desc(`Accuracy over validation set`)))
+```
+
+When the models are run over the validation data set, we see that the gamLoess and gam method provide similar results to the GLM approach (however it should be noted that these algorithms took more time to run).
+
+This exploration confirms that the GLM method is well suited for this data set experiment.
+
+## An exploration: approaching the missing data
+
+Up to now, we have been carefull to discard from the training and validation data, all rows from the Heart Disease dataset that contained "NAs". In this section, we will explore a data imputation method and assess the obtained accuracy. The MICE package will be used to complete the datasets. For the purpose of this exploration, only the selected method (GLM) will be used to train the model with the imputed data.
+
+A reasonable assumption in using the MICE package is to consider the data is missing at random.
+
+### Visualisation of the missing data
+Before training the model, it is possible to visualize the missing data, provifing insights on which features in the datasets are particularily scarce.
+We will use a function provided by the VIM package.
+
+
+```{r eval=T, message=F, warning=F, results='hide', echo=TRUE,fig.height=5, fig.width=9}
+aggr_plot <- aggr(hd_trainset, col=c('navyblue','red'), numbers=TRUE,
+                  sortVars=TRUE, labels=names(hd_trainset), cex.axis=.7,
+                  gap=3, ylab=c("Histogram of missing data","Pattern"))
+```
+
+### Imputing the data and training the GLM model
+```{r eval=T, message=F, warning=F, results='hide', echo=TRUE}
+## Imputing the missing data
+impResult<-mice(data = hd_trainset, m = 5, method = "pmm", maxit = 50, seed = 500)
+completedTrainData <- complete(impResult,1)
+
+
+## Training the model
+control_train <- trainControl(method = "cv", number = 10, p = .9)
+models <- c("glm")
+
+fits <- lapply(models, function(model){ 
+  print(model)
+  train(presence ~ sex+cp+fbs+exang+slope+ca+thal, method = model, data = completedTrainData,trControl = control_train)
+}) 
+names(fits) <- models
+```
+### Completing the validation data set and predicting the disease presence
+
+Now that the model is trained, the validation data set needs first to be completed as well, as this data sets also misses data. We will use the same approach as for the training data set, relying on the MICE data set with the same parameters.
+
+```{r eval=T, message=F, warning=F, results='hide', echo=TRUE}
+impResult<-mice(data = hd_valset, m = 5, method = "pmm", maxit = 50, seed = 500)
+completedValData <- complete(impResult,1)
+
+```
+
+The final prediction can then be carried out and accuracty calculated:
+```{r eval=T, message=F, warning=F, results='hide', echo=TRUE}
+pred <- sapply(fits, function(object) 
+  predict(object, newdata = completedValData))
+dim(pred)
+
+acc <- colMeans(pred == hd_valset$presence)
+
+```
+
+This provides an accuracy of 0.8324 over the validation test set.
+
+This exploration is interesting and shows that data imputing has degraded to the overall accuracy of the GLM model, but not to an extent that would render this approach unacceptable. Further investigations could be to tune the imputing method (we used the **Predictive mean matching** univariate imputation method). A drawback of data imputation in this case is that it requires to be carried out on the validation data as well before predicting the presence or absence of heart disease.
+
+# Conclusion
+
+After an exploratory data analysis, a number of features in the data set were determined to be significant to predict the presence/absence of heart disease over patients. A variety of methods were investigated and the method selected was the Generalized Linear Model, achieving a prediction accuracy of about **87.5%** over the validation data set.
+The exploratory data analysis revealed a large number of incomplete patient feature. A further investigation was carried out to explore ways to handle the missing data.
+
 # References and Credits
 
-Ajouter le nom des personnes à mentionner concernant l'origine des données.
+## References
+* Data Analysis and Prediction Algorithms with R, Rafael A. Irizarry, https://rafalab.github.io/dsbook/
+* Missing Data Analysis with mice, Firouzeh Noghrehchi, https://web.maths.unsw.edu.au/~dwarton/missingDataLab.html
+
+
+## Credits
+
+The authors of the databases used for this project have requested that any publications resulting from the use of the data include the names of the principal investigator responsible for the data collection at each institution.  They would be:
+
+1. Hungarian Institute of Cardiology. Budapest: Andras Janosi, M.D.
+2. University Hospital, Zurich, Switzerland: William Steinbrunn, M.D.
+3. University Hospital, Basel, Switzerland: Matthias Pfisterer, M.D.
+4. V.A. Medical Center, Long Beach and Cleveland Clinic Foundation: Robert Detrano, M.D., Ph.D.
+	  
+	  

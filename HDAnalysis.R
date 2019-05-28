@@ -1,6 +1,18 @@
-##Analysis script
+################################
+# HarvardX Data Science Professional Certificate
+# Capstone Project submission - Data Analysis Script
+# Notes: 
+#     - this script relies on a certain number of libraries. Please make sure to 
+#       have them install in your R environment
+#
+#     - please refer to the project report for more information
+#
+# Heart Disease Analysis Project
+# F. Seka, 28/05/2019
+#################################
 
-# Cleaning workspace
+
+# Cleaning the workspace
 rm(list=ls())
 
 # Loading the used libraries
@@ -14,8 +26,9 @@ library(rpart)
 library(rpart.plot)
 library(ROCR)
 library(mgcv)
+library(VIM)
 
-
+# Data preparation ----
 datasetdir<-file.path(getwd(),"Data")
 datacolnames <- c("age","sex","cp","trestbps","chol","fbs","restecg","thalach","exang","oldpeak","slope","ca","thal","target") #defining the column names
 
@@ -24,12 +37,11 @@ swissdata<-read.csv(file.path(datasetdir,"processed.switzerland.data"), header=F
 vadata<-read.csv(file.path(datasetdir,"processed.va.data"), header=FALSE)
 hungariandata<-read.csv(file.path(datasetdir,"processed.hungarian.data"), header=FALSE)
 
-#  assign the header names
+#  assigning the header names
 names(clevelanddata)<-datacolnames
 names(swissdata)<-datacolnames
 names(vadata)<-datacolnames
 names(hungariandata)<-datacolnames
-
 
 # before concatenating, adding one column to indicate origin of data
 clevelanddata<- mutate (clevelanddata, institute="Cleveland")
@@ -40,15 +52,12 @@ hungariandata<- mutate (hungariandata, institute="Hungary")
 # build a unique dataset concatenating the rows from all previous 4 research institutes
 heartdisease<-rbind(clevelanddata,swissdata,vadata,hungariandata)
 
-
 # We can now remove the individual datasets and variables to free some workspace memory
 rm(clevelanddata,swissdata,vadata,hungariandata,datacolnames,datasetdir)
 
-# Data exploration
-
+# Data exploration ----
 
 ## Data preparation
-
 
 # Adding factors to the features based on the data description. This will facilitate the creation and labelling of plots with the ggplot() package
 heartdisease$sex<-as.factor(heartdisease$sex)
@@ -131,7 +140,8 @@ hd_trainset <- heartdisease[-val_index,] #defining the heart disease training da
 hd_valset <- heartdisease[val_index,] #defining the heart disease validation data set
 
 
-## Feature exploration
+##### Feature exploration ----
+if (TRUE){
 # It is now possible to look closely to the different features in the training set. This first exploration will be carried out by means of data visualisation.
 
 #Continuous features
@@ -325,7 +335,7 @@ plot(varImp(train_rf), top = 10)
 rf_results<-predict(train_rf,hd_valset,type ="prob")
 
 
-##### Regression Tree
+##### Regression Tree Method
 
 control_rt <- trainControl(method = "cv", number = 10, p = .9)
 train_rt <- train(presence ~ sex+cp+fbs+exang+slope+ca+thal ,
@@ -458,14 +468,13 @@ glm_metrics %>% ggplot(aes(x=Threshold,y=Accuracy,label = Threshold)) +
   labs(x="Decision Threshold",y="Overall Accuracy") + 
   geom_text_repel(nudge_x = 0.01, nudge_y = -0.01)
 
+}
 
-
-##### Larger methods assessment
-
+##### Larger methods assessment  -------
+if (TRUE){
 ## Removing NAs from the training set
 keep_index<-complete.cases(hd_trainset)
-hd_trainset<-hd_trainset2[keep_index,]
-
+hd_trainset_noNAs<-hd_trainset[keep_index,]
 
 # Models
 
@@ -478,17 +487,89 @@ models <- c("glm","lda", "gamLoess", "gam", "qda","knn", "kknn",
 
 fits <- lapply(models, function(model){ 
   print(model)
-  train(presence ~ sex+cp+fbs+exang+slope+ca+thal, method = model, data = hd_trainset,trControl = control_train ,na.action = na.omit)
+  train(presence ~ sex+cp+fbs+exang+slope+ca+thal, method = model, data = hd_trainset_noNAs,trControl = control_train ,na.action = na.omit)
 }) 
 names(fits) <- models
 
+training_acc<-matrix(NA,nrow=length(models),ncol=2) # pre allocate training accuracy matrix
+# for loop to populate matrix with the results
+for(i in seq(1,length(models),1)){
+  training_acc[i,1]<-models[i]
+  training_acc[i,2]<-fits[[i]]$results$Accuracy[1]
+}
+# formatting the dataframe
+training_acc<-as.data.frame(training_acc)
+training_acc[2]<-round(as.numeric(as.character(unlist(training_acc[2]))),4)
+names(training_acc)<-c("Method","Accuracy over training set")
+# displaying the results
+library(knitr)
+kable(training_acc %>% arrange(desc(`Accuracy over training set`)))
 
+# predictions on the validation test set, 
+## first we remove the NAs in the validation data
 keep_index<-complete.cases(hd_valset)
-hd_valset<-hd_valset[keep_index,]
+hd_valset_noNAs<-hd_valset[keep_index,]
 
-# prediction
+## then we predict the disease
 pred <- sapply(fits, function(object) 
-  predict(object, newdata = hd_valset))
+  predict(object, newdata = hd_valset_noNAs))
+dim(pred)
+
+validation_acc <- colMeans(pred == hd_valset_noNAs$presence)
+# formatting the dataframe
+validation_acc<-as.data.frame(unname(validation_acc))
+validation_acc<-cbind(models,validation_acc)
+names(validation_acc)<-c("Method","Accuracy over validation set")
+kable(validation_acc %>% arrange(desc(`Accuracy over validation set`)))
+
+}
+
+##### Investigation of missing NAs assessment -------
+if (TRUE){
+# Complete the training data set, usingh the MICE package
+## getting a better understaing of the missing data
+
+aggr_plot <- aggr(hd_trainset, col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE, labels=names(hd_trainset), cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"))
+
+## Imputing the missing data
+impResult<-mice(data = hd_trainset, m = 5, method = "pmm", maxit = 50, seed = 500)
+completedTrainData <- complete(impResult,1)
+
+
+## Training the model
+control_train <- trainControl(method = "cv", number = 10, p = .9)
+models <- c("glm")
+
+fits <- lapply(models, function(model){ 
+  print(model)
+  train(presence ~ sex+cp+fbs+exang+slope+ca+thal, method = model, data = completedTrainData,trControl = control_train)
+}) 
+names(fits) <- models
+
+training_acc<-matrix(NA,nrow=length(models),ncol=2) # pre allocate training accuracy matrix
+# for loop to populate matrix with the results
+for(i in seq(1,length(models),1)){
+  training_acc[i,1]<-models[i]
+  training_acc[i,2]<-fits[[i]]$results$Accuracy[1]
+}
+# formatting the dataframe
+training_acc<-as.data.frame(training_acc)
+training_acc[2]<-round(as.numeric(as.character(unlist(training_acc[2]))),4)
+names(training_acc)<-c("Method","Accuracy over training set")
+# displaying the results
+library(knitr)
+kable(training_acc %>% arrange(desc(`Accuracy over training set`)))
+
+# prediction on validation test set
+## Imputing the missing data in the validation training set
+
+impResult<-mice(data = hd_valset, m = 5, method = "pmm", maxit = 50, seed = 500)
+completedValData <- complete(impResult,1)
+
+
+pred <- sapply(fits, function(object) 
+  predict(object, newdata = completedValData))
 dim(pred)
 
 acc <- colMeans(pred == hd_valset$presence)
+}
