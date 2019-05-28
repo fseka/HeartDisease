@@ -31,11 +31,6 @@ library(mgcv)
 library(VIM)
 library(knitr)
 
-# Checking presence of required packages. If not present, 
-list.of.packages <- c("tidyverse", "caret", "ggthemes","mice","ggrepel","randomForest","rpart","rpart.plot", "ROCR","mgcv","VIM","knitr")
-new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
-if(length(new.packages)) install.packages(new.packages)
-
 
 # Data preparation ----
 datasetdir<-file.path(getwd(),"Data")

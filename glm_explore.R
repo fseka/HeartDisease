@@ -219,7 +219,9 @@ pred <- sapply(fits, function(object)
 dim(pred)
 
 acc <- colMeans(pred == hd_valset$presence)
-
+imputed_acc<-as.data.frame(acc)
+imputed_acc[2]<-round(as.numeric(as.character(unlist(imputed_acc[2]))),4)
+names(imputed_acc)<-c("Method","Accuracy over training set")
 
 votes <- rowMeans(pred == "Heart Disease")
 y_hat <- ifelse(votes > 0.5, "Heart Disease", "Healthy")
