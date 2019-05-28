@@ -1,38 +1,47 @@
 ---
 title: "Heart Disease Analysis Project"
+subtitle: "HarvardX Data Science Capstone Project"
 author: "Florian Seka"
 date: "28/05/2019"
 output:
-  html_document:
-    df_print: paged
-    toc: yes
-  documentclass: report
   pdf_document:
     toc: yes
     toc_depth: 4
     number_sections: true
     df_print: kable
+  documentclass: report
+  urlcolor: blue
+  html_document:
+    df_print: paged
+    toc: yes
+urlcolor: blue
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+\newpage
+
 # Introduction
-
-## Motivation and purpose
-
-The purpose of this report is to document the various strategies investigated in the frame of the data science capstone final project, in partial fulfilment of the requirements for the EDX Harvard Data Science Professional Certificate.
-
-In the first part of the report, information is briefly given about the structuring and preparation of the data used to build and evaluate the machine learning algorithms, as well as the different methods that will be developed to achieve the best possible final result. In the second part, the final, optimised, algorithm is selected and tested against the validation dataset.
 
 ## Project Presentation
 
 The subject chosen for this capstone project is the Heart Disease Data Set from the UCI Machine learning repository. This dataset gathers data from four different medical institution and provides, for each patient, a number of attributes, as well as a measure of heart disease presence (from "no presence" to different levels of presence). Our objective will be to predict, given a patients set of attributes (medical parameters), the presence or absence of medical disease.
 
+This dataset has also been used in Data Science competitions such as Kagle. However, only the processed data from the Cleveland Clinic Foundation was used. Our study attempts to carry the data analysis on the concatenation of all datasets made available on the UC Irvine Machine Learning Repository.
+
+## Purpose and plan
+
+The purpose of this report is to document the various strategies investigated in the frame of the data science capstone final project, in partial fulfilment of the requirements for the EDX Harvard Data Science Professional Certificate.
+
+In the first part of the report, information is briefly given about the structuring and preparation of the data used to build and evaluate the machine learning algorithms, as well as the different methods that will be developed to achieve the best possible final result. In the second part, the final, optimised, algorithm is selected and tested against the validation dataset.
+
+A final investigation of the data is provided, with regard to the rather important number of missing values in the dataset. A predictive mean matching algorithm is used to complete the datasets in order to allow a prediction. 
+
 ## Executive summary
 
-After having determined the most important features in the dataset, and tested a variety of machine learning methods, the selected method was XXXXX. A total of XX methods were evaluated Applied to the validation data set, an ROC AUC of XXX could be achieved, with an accuracy of XXXX and the following confusion matrix: XXXX.
+After having determined the most important features in the dataset, and tested a variety of machine learning methods, the selected method was the **Genralized Linear Model (GLM)**, achieving an accuracy of about 87.5%. A further analysis also presented in this report extended the number of methods being investigated and confirmed that the GLM was the most suited for this experiment.
 
 
 ## Additionnal information
@@ -47,6 +56,7 @@ https://github.com/fseka/HeartDisease
 ### Data Source and structure
 
 The data used for this experiment was created by four medical research entities:
+
 * Hungarian Institute of Cardiology.
 * University Hospital, Zurich, Switzerland 
 * University Hospital, Basel, Switzerland
@@ -119,7 +129,12 @@ The data provided by the UCI repository first needs to be gathered and prepared.
 ```{r eval=T, message=F, warning=F, results='hide'}
 
 datasetdir<-file.path(getwd(),"Data")
-datacolnames <- c("age","sex","cp","trestbps","chol","fbs","restecg","thalach","exang","oldpeak","slope","ca","thal","target") #defining the column names
+datacolnames <- c("age","sex","cp","trestbps","chol","fbs","restecg","thalach","exang",
+                  "oldpeak",
+                  "slope",
+                  "ca",
+                  "thal",
+                  "target") #defining the column names
 
 clevelanddata<-read.csv(file.path(datasetdir,"processed.cleveland.data"), header=FALSE)
 swissdata<-read.csv(file.path(datasetdir,"processed.switzerland.data"), header=FALSE)
@@ -275,6 +290,7 @@ hd_trainset %>%
 
 The cholesterol data reveals differences between research institutes, that could be probably explained by input errors. Regardless, the serum cholesterol does not appear to be significantly different between healthy and people suffering from heart disease. This feature will be discarded.
 
+\newpage
 
 **Trestbps Resting blood pressure (in mm Hg on admission to the hospital):**
 
@@ -330,7 +346,7 @@ hd_trainset %>%
   scale_fill_manual(values=c("springgreen2","firebrick2"))
 ```
 
-The visualisation tends to show that there is heart disease affect more men than women. Modifying the plotting script to show percentages confirms this observation.
+The visualisation tends to show that heart diseases affect more men than women. Modifying the plotting script to show percentages confirms this observation.
 
 ```{r eval=T, message=F, warning=F, results='hide',fig.height=5, fig.width=9, echo=FALSE}
 #Sex, in percentages
@@ -356,6 +372,7 @@ hd_trainset %>%  filter(!is.na(cp)) %>% group_by(cp,presence) %>% summarise(coun
 ```
 The type of chest pain is an interesting parameter, as the data reveals. Patient declaring a chest pain type of 4 are more likely to suffer from heart disease.
 
+ \newpage
 **Fast blood sugar:**
 
 ```{r eval=T, message=F, warning=F, results='hide',fig.height=5, fig.width=9, echo=FALSE}
@@ -376,7 +393,7 @@ hd_trainset %>%  filter(!is.na(fbs)) %>% group_by(fbs,presence) %>% summarise(co
   scale_fill_manual(values=c("springgreen2","firebrick2"))+
   ylab("Percentages")
 ```
-
+\newpage
 **Rest ECG:**
 
 ```{r eval=T, message=F, warning=F, results='hide',fig.height=5, fig.width=9, echo=FALSE}
@@ -472,7 +489,10 @@ All methods will be run with the same training control. The cross validation, wi
 
 ```{r}
 control_glm <- trainControl(method = "cv", number = 10, p = .9)
-train_glm <- train(presence ~ sex+cp+fbs+exang+slope+ca+thal, method = "glm",family=binomial, data = hd_trainset,trControl = control_glm ,na.action = na.omit)
+train_glm <- train(presence ~ sex+cp+fbs+exang+slope+ca+thal, method = "glm",
+                   family=binomial, 
+                   data = hd_trainset,trControl = control_glm ,
+                   na.action = na.omit)
 glm_results<-predict(train_glm,hd_valset,type ="prob")
 ```
 
@@ -532,7 +552,12 @@ glm_metrics %>% ggplot(aes(x=Threshold,y=Accuracy,label = Threshold)) +
 
 ```{r}
 control_knn <- trainControl(method = "cv", number = 10, p = .9)
-train_knn <- train(presence ~ sex+cp+fbs+exang+slope+ca+thal, method = "knn",data = hd_trainset,trControl = control_knn ,tuneGrid = data.frame(k=seq(1,20,1)),na.action = na.omit)
+train_knn <- train(presence ~ sex+cp+fbs+exang+slope+ca+thal, 
+                   method = "knn",
+                   data = hd_trainset,
+                   trControl = control_knn ,
+           tuneGrid=data.frame(k=seq(1,20,1)),
+           na.action = na.omit)
 knn_results<-predict(train_knn,hd_valset,type ="prob")
 ```
 ### Random Forest
@@ -549,7 +574,7 @@ rf_results<-predict(train_rf,hd_valset,type ="prob")
 ```
 
 The variable importance function provides interesting insights in the significant features that predominantly determine the presence/absence of disease:
-```{r}
+```{r fig.height=5, fig.width=9}
 varImpPlot(train_rf$finalModel)
 # plotting the most important features and associated value, in decreasing importance
 plot(varImp(train_rf), top = 10)
@@ -572,7 +597,7 @@ rt_results<-predict(train_rt,hd_valset,type ="prob")
 
 The resulting decision tree can be drawn usinf the rpart.plot package:
 
-```{r eval=T}
+```{r eval=T, fig.height=5, fig.width=9}
 rpart.plot(train_rt$finalModel,   
            type=5,
            fallen.leaves = FALSE,
@@ -761,7 +786,8 @@ models <- c("glm")
 
 fits <- lapply(models, function(model){ 
   print(model)
-  train(presence ~ sex+cp+fbs+exang+slope+ca+thal, method = model, data = completedTrainData,trControl = control_train)
+  train(presence ~ sex+cp+fbs+exang+slope+ca+thal, method = model, data = completedTrainData,
+        trControl = control_train)
 }) 
 names(fits) <- models
 ```
@@ -792,13 +818,16 @@ This exploration is interesting and shows that data imputing has degraded to the
 # Conclusion
 
 After an exploratory data analysis, a number of features in the data set were determined to be significant to predict the presence/absence of heart disease over patients. A variety of methods were investigated and the method selected was the Generalized Linear Model, achieving a prediction accuracy of about **87.5%** over the validation data set.
-The exploratory data analysis revealed a large number of incomplete patient feature. A further investigation was carried out to explore ways to handle the missing data.
+
+The exploratory data analysis revealed a large number of incomplete patient features. A further investigation was carried out to explore ways to handle the missing data. The imputation method used, in conjunction with the selected GLM method, led to achieve a prediction accuracy of about 85%.
+
+\newpage
 
 # References and Credits
 
 ## References
-* Data Analysis and Prediction Algorithms with R, Rafael A. Irizarry, https://rafalab.github.io/dsbook/
-* Missing Data Analysis with mice, Firouzeh Noghrehchi, https://web.maths.unsw.edu.au/~dwarton/missingDataLab.html
+* **Data Analysis and Prediction Algorithms with R**, Rafael A. Irizarry, https://rafalab.github.io/dsbook/
+* **Missing Data Analysis with mice**, Firouzeh Noghrehchi, https://web.maths.unsw.edu.au/~dwarton/missingDataLab.html
 
 
 ## Credits
