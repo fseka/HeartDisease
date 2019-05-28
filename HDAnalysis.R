@@ -4,8 +4,10 @@
 # Notes: 
 #     - this script relies on a certain number of libraries. Please make sure to 
 #       have them install in your R environment
-#
+#     - make sure to have downloaded the Data Files
 #     - please refer to the project report for more information
+#
+# Github link: https://github.com/fseka/HeartDisease
 #
 # Heart Disease Analysis Project
 # F. Seka, 28/05/2019
