@@ -785,7 +785,7 @@ acc <- colMeans(pred == hd_valset$presence)
 
 ```
 
-This provides an accuracy of 0.8324 over the validation test set.
+This provides an accuracy of 0.854 over the validation test set.
 
 This exploration is interesting and shows that data imputing has degraded to the overall accuracy of the GLM model, but not to an extent that would render this approach unacceptable. Further investigations could be to tune the imputing method (we used the **Predictive mean matching** univariate imputation method). A drawback of data imputation in this case is that it requires to be carried out on the validation data as well before predicting the presence or absence of heart disease.
 
